@@ -61,7 +61,7 @@ See the documentation of \code{\link[ggplot2:facet_wrap]{ggplot2::facet_wrap()}}
 \item{max.overlaps}{\code{max.overlaps} argument for \code{\link[ggrepel:geom_text_repel]{ggrepel::geom_text_repel()}}}
 }
 \value{
-A ggplot object showing variance vs mean,
+A ggplot object showing standard deviation vs mean,
 along with the predicted values of the linear model
 }
 \description{
