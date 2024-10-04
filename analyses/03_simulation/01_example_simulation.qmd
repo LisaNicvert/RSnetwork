@@ -1,0 +1,422 @@
+---
+title: "Example simulation"
+format: 
+  html:
+    toc: true
+    toc-depth: 3
+editor: source
+date: today
+date-format: long
+author: 
+  - name: "Lisa Nicvert"
+    orcid: 0009-0006-5763-0865
+embed-resources: true
+code-fold: true
+params:
+  colco: "darkred"
+  colli: "cornflowerblue"
+---
+
+
+```{r, message=FALSE}
+library(here)
+
+library(ade4)
+library(adegraphics)
+
+library(ggplot2)
+library(patchwork)
+library(tibble)
+library(dplyr)
+library(tidyr)
+library(RColorBrewer)
+
+library(RSnetwork)
+
+# Figures ---
+figures_path <- here("figures/03_simulation/01_example_simulation")
+```
+
+
+```{r}
+cfun <- function(a, b) {
+  res <- list("mean_cor" = data.frame(),
+              "var_cor" = data.frame(),
+              "var_area_cor" = data.frame())
+  
+  res$mean_cor <- rbind(a$mean_cor, b$mean_cor)
+  res$var_cor <- rbind(a$var_cor, b$var_cor)
+  res$var_area_cor <- rbind(a$var_area_cor, b$var_area_cor)
+  return(res)
+}
+```
+
+## Simulation parameters
+
+```{r}
+set.seed(12)
+
+# Simulation parameters ---
+nbird <- 12
+nplant <- 8
+ninter <- 300
+
+meanlog <- log(3)
+sdlog <- log(1.5)
+
+le_grad <- 100
+mean_tol <- 10
+sd_tol <- 5
+
+ratio_grad <- 0.7
+stepgrad <- 0.5
+
+delta <- 0.2
+```
+
+```{r}
+birdab <- rlnorm(nbird, meanlog = meanlog, 
+                 sdlog = sdlog)
+plantab <- rlnorm(nplant, meanlog = meanlog, 
+                 sdlog = sdlog)
+```
+
+## Perform simulation
+
+```{r}
+sim <- compas2d(nconsumer = nbird, 
+                nresource = nplant,
+                le_grad = le_grad, 
+                col_prefix = "b",
+                row_prefix = "p",
+                rowvar_prefix = "tp",
+                remove_zeroes = FALSE,
+                consumer_ab = birdab,
+                resource_ab = plantab,
+                ninter = ninter,
+                ratio_grad = ratio_grad,
+                mean_tol = mean_tol, 
+                sd_tol = sd_tol,
+                delta = delta,
+                return_intermediate = TRUE,
+                buffer = 0)
+
+comm <- sim$comm
+bird_niche <- sim$colvar
+plant_traits <- sim$rowvar
+
+p_matching <- sim$intermediate$p_matching
+ab_neutral <- sim$intermediate$ab_neutral
+p_mix <- sim$intermediate$p_mix
+
+
+plant_traits_df <- as.data.frame(plant_traits) |> 
+  rownames_to_column("spp")
+```
+
+## Plot traits
+
+### Bird traits
+
+```{r}
+# Get traits gradient
+x1 <- seq(0, le_grad, by = stepgrad)
+x2 <- seq((1-ratio_grad) / 2 * le_grad, 
+          le_grad - (1-ratio_grad) / 2 * le_grad, by = stepgrad)
+# Get coordinates of each cell on axes 1 and 2
+x <- expand.grid(x1, x2)
+
+gradmin2 <- (1-ratio_grad) / 2 * le_grad
+gradmax2 <- le_grad - (1-ratio_grad) / 2 * le_grad
+
+lwd <- 1
+```
+
+```{r}
+# Plot birds
+
+# Compute gaussians from traits values and tolerances
+dens <- lapply(1:nbird,
+               function (i) mvtnorm::dmvnorm(x, 
+                                             mean = bird_niche[i , "mean", ], 
+                                             sigma = diag(bird_niche[i , "sd", ]^2)))
+
+# Format dataframe
+dens <- unlist(dens)
+dens_df <- data.frame(dens,
+                      spp = rep(colnames(comm), each = nrow(x)),
+                      x1 = rep(x[, 1], nbird),
+                      x2 = rep(x[, 2], nbird))
+# Order with niche mean (for colors)
+dens_df$spp <- factor(dens_df$spp, 
+                      levels = colnames(comm)[order(bird_niche[, "mean", 1])])
+
+# Compute margins
+marginal_dens1 <- dens_df |> 
+  group_by(x1, spp) |> 
+  summarise(dens = sum(dens), .groups = "drop")
+
+marginal_dens2 <- dens_df |> 
+  group_by(x2, spp) |> 
+  summarise(dens = sum(dens), .groups = "drop")
+
+# Compute traits heights
+trait_means <- bird_niche[, "mean", ]
+colnames(trait_means) <- c("t1", "t2")
+trait_means <- data.frame(trait_means) |> 
+  rownames_to_column("spp")
+
+h1 <- marginal_dens1 |> 
+  group_by(spp) |> 
+  summarise(h1 = max(dens), .groups = "drop")
+
+h1 <- trait_means |> 
+  select(-t2) |> 
+  left_join(h1, by = "spp")
+
+h2 <- marginal_dens2 |> 
+  group_by(spp) |> 
+  summarise(h2 = max(dens), .groups = "drop")
+
+h2 <- trait_means |> 
+  select(-t1) |> 
+  left_join(h2, by = "spp")
+```
+
+
+```{r}
+# Plot
+ylim <- max(c(max(marginal_dens1$dens), max(marginal_dens2$dens))) 
+
+g1 <- ggplot(marginal_dens1) +
+  geom_line(aes(x = x1, y = dens, col = spp),
+            linewidth = lwd,
+            show.legend = FALSE) +
+  geom_segment(data = h1,
+               aes(x = t1, xend = t1,
+                   y = 0, yend = h1, col = spp),
+               linewidth = lwd,
+               show.legend = FALSE) + 
+  annotate("segment",
+           x = 0, 
+           xend = le_grad, 
+           y = 0, yend = 0,
+           linewidth = lwd)
+
+g2 <- ggplot(marginal_dens2) +
+  geom_line(aes(x = x2, y = dens, col = spp),
+            linewidth = lwd,
+            show.legend = FALSE) +
+  geom_segment(data = h2,
+               aes(x = t2, xend = t2,
+                   y = 0, yend = h2, col = spp),
+               linewidth = lwd,
+               show.legend = FALSE) + 
+  annotate("segment",
+           x = gradmin2, 
+           xend = gradmax2, 
+           y = 0, yend = 0,
+           linewidth = lwd)
+
+palbird <- rev(colorRampPalette(brewer.pal(9, "Reds")[3:9])(nbird))
+
+g1 / g2 & xlim(c(0, le_grad)) &
+  ylim(c(0, ylim)) &
+  # scale_colour_viridis_d(option = "A", end = 0.9) &
+  scale_color_manual(values = palbird) &
+  theme_void() &
+  theme(plot.margin = margin(0, 0, 0, 0))
+
+# Save figure
+ggsave(file.path(figures_path, "bird_niches.png"),
+       width = 13, height = 8, 
+       units = "cm",
+       dpi = 600)
+```
+
+### Plant traits
+
+```{r}
+barheight <- min(c(max(marginal_dens1$dens), max(marginal_dens2$dens)))
+
+# Order with trait 1 (for colors)
+plant_traits_df$spp <- factor(plant_traits_df$spp, 
+                              levels = rownames(comm)[order(plant_traits_df$tp1)])
+
+g1 <- ggplot(plant_traits_df) +
+  geom_segment(aes(x = tp1, xend = tp1, 
+                   y = 0, yend = barheight, col = spp),
+               linewidth = lwd,
+               show.legend = FALSE) + 
+  annotate("segment",
+           x = 0, xend = le_grad, 
+           y = 0, yend = 0,
+           linewidth = lwd)
+
+g2 <- ggplot(plant_traits_df) +
+  geom_segment(aes(x = tp2, xend = tp2, 
+                   y = 0, yend = barheight, col = spp),
+               linewidth = lwd,
+               show.legend = FALSE) + 
+  annotate("segment",
+           x = gradmin2, 
+           xend = gradmax2, 
+           y = 0, yend = 0,
+           linewidth = lwd)
+
+
+palplant <- rev(colorRampPalette(brewer.pal(9, "Blues")[3:9])(nplant))
+
+g1 / g2 & xlim(c(0, le_grad)) & 
+  ylim(c(0, ylim)) &
+  theme(plot.margin = margin(0, 0, 0, 0)) &
+  scale_color_manual(values = palplant) &
+  # scale_colour_viridis_d(end = 0.9) &
+  theme_void()
+
+# Save figure
+ggsave(file.path(figures_path, "plant_niches.png"),
+       width = 13, height = 8, 
+       units = "cm",
+       dpi = 600)
+```
+
+
+### Abundances
+
+```{r}
+g1 <- ggplot() +
+  geom_col(aes(x = reorder(plantab, -plantab), y = plantab), 
+           fill = params$colli)
+
+g2 <- ggplot() +
+  geom_col(aes(x = reorder(birdab, -birdab), y = birdab),
+           fill = params$colco)
+
+g1 + g2 & 
+  ylim(c(0, max(plantab, birdab))) &
+  coord_fixed() &
+  theme_void() &
+  theme(plot.margin = margin(0, 10, 0, 10))
+
+# Save figure
+ggsave(file.path(figures_path, "abundances.png"),
+       width = 12, height = 3, 
+       units = "cm",
+       dpi = 600)
+```
+
+```{r}
+ca <- dudi.coa(comm, scannf = FALSE, nf = 2)
+
+max_size <- 10
+```
+
+### Plot matching matrix
+
+```{r}
+p_matching_reordered <- p_matching[order(ca$li[, 1]),
+                                   order(ca$co[, 1])]
+
+plot_matrix(data.frame(p_matching_reordered), 
+            max_size = max_size) +
+  theme(axis.text = element_blank(),
+        axis.text.x.top = element_blank(),
+        axis.title = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid.major = element_blank(),
+        legend.position="none",
+        plot.background = element_blank(),
+        axis.line.x.top = element_line(colour = params$colco, 
+                                       linewidth = 3),
+        axis.line.y = element_line(colour = params$colli, 
+                                   linewidth = 3))
+
+# Save figure
+ggsave(file.path(figures_path, "p_matching.png"),
+       width = nbird, height = nplant, 
+       units = "cm",
+       dpi = 600)
+```
+
+### Plot neutral matrix
+
+```{r}
+ab_neutral_reordered <- ab_neutral[order(ca$li[, 1]),
+                                   order(ca$co[, 1])]
+
+plot_matrix(data.frame(ab_neutral_reordered), 
+            max_size = max_size) +
+  theme(axis.text = element_blank(),
+        axis.text.x.top = element_blank(),
+        axis.title = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid.major = element_blank(),
+        legend.position="none",
+        plot.background = element_blank(),
+        axis.line.x.top = element_line(colour = params$colco, 
+                                       linewidth = 3),
+        axis.line.y = element_line(colour = params$colli, 
+                                   linewidth = 3))
+
+# Save figure
+ggsave(file.path(figures_path, "ab_neutral.png"),
+       width = nbird, height = nplant, 
+       units = "cm",
+       dpi = 600)
+```
+
+### Plot mix matrix
+
+```{r}
+p_mix_reordered <- p_mix[order(ca$li[, 1]),
+                         order(ca$co[, 1])]
+
+plot_matrix(data.frame(p_mix_reordered), 
+            max_size = max_size) +
+  theme(axis.text = element_blank(),
+        axis.text.x.top = element_blank(),
+        axis.title = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid.major = element_blank(),
+        legend.position="none",
+        plot.background = element_blank(),
+        axis.line.x.top = element_line(colour = params$colco, 
+                                       linewidth = 3),
+        axis.line.y = element_line(colour = params$colli, 
+                                   linewidth = 3))
+
+# Save figure
+ggsave(file.path(figures_path, "p_mix.png"),
+       width = nbird, height = nplant, 
+       units = "cm",
+       dpi = 600)
+```
+
+### Plot final matrix
+
+```{r}
+comm_reordered <- comm[order(ca$li[, 1]),
+                       order(ca$co[, 1])]
+
+plot_matrix(data.frame(comm_reordered),
+            max_size = max_size) +
+  theme(axis.text = element_blank(),
+        axis.text.x.top = element_blank(),
+        axis.title = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid.major = element_blank(),
+        legend.position="none",
+        plot.background = element_blank(),
+        axis.line.x.top = element_line(colour = params$colco, 
+                                       linewidth = 3),
+        axis.line.y = element_line(colour = params$colli, 
+                                   linewidth = 3))
+
+# Save figure
+ggsave(file.path(figures_path, "ab_sampled.png"),
+       width = nbird, height = nplant, 
+       units = "cm",
+       dpi = 600)
+```
+

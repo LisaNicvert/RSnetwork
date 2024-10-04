@@ -1,0 +1,15 @@
+"plant_species_code","plant_species","meanL","meanD1","meanHeight","CropMass"
+"P01","Ericaceae_300",4.3,2.8,7,NA
+"P02","Ericaceae_301",3,3.2,5,NA
+"P03","Ericaceae_302",5.1,5.6,3,NA
+"P04","Ericaceae_305",NA,NA,NA,NA
+"P06","Gaultheria_erecta",3.5,4.7,2.5,0.5
+"P08","Graffenrieda_harlingii",4.3,3.9,9,3.5
+"P09","Guettarda_hirsuta",8.1,7.5,7,6.6
+"P11","Miconia_305",4.4,4.4,5.5,3.8
+"P12","Miconia_306",4.1,4.5,5,2.3
+"P13","Miconia_307",1.2,1.4,5,0
+"P14","Miconia_radula",6.2,6.3,4,19.3
+"P15","Nertera_depressa",5.4,5.5,0.1,NA
+"P17","Schefflera_300",20.5,21.5,6,1033.3
+"P19","Symplocos_sulcinervius",10.2,9.4,6,NA

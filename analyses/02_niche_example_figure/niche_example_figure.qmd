@@ -1,0 +1,94 @@
+---
+title: "Visualize niche"
+format: 
+  html:
+    toc: true
+    toc-depth: 3
+editor: source
+date: today
+date-format: long
+author: 
+  - name: "Lisa Nicvert"
+    orcid: 0009-0006-5763-0865
+embed-resources: true
+code-fold: true
+---
+
+```{r}
+library(here)
+
+# Custom package
+library(RSnetwork)
+library(ade4)
+library(adegraphics)
+
+# Paths ---
+figures_path <- here("figures/02_niche_example_figure")
+
+set.seed(38)
+```
+
+This script produces a figure to illustrate the correspondence between ellipses and niche indices.
+
+## Simulate data
+
+First, we create a small synthetic dataset.
+
+```{r, fig.width=7, fig.height=5}
+sim <- compas2d(nconsumer = 20, 
+                nresource = 15,
+                le_grad = 100, 
+                col_prefix = "B",
+                row_prefix = "P",
+                rowvar_prefix = "tp",
+                remove_zeroes = FALSE,
+                ninter = 100,
+                ratio_grad = 0.5,
+                mean_tol = 40, 
+                sd_tol = 10,
+                delta = 1,
+                buffer = 0)
+
+mat <- as.data.frame(sim$comm)
+
+ca_sim <- dudi.coa(mat, nf = 2, scannf = FALSE)
+
+mat_reordered <- mat[order(ca_sim$li[, 1]), 
+                     order(ca_sim$co[, 1])]
+plot_matrix(mat_reordered, max_size = 4)
+```
+
+```{r}
+recscal_sim <- RSnetwork::reciprocal.coa(ca_sim)
+```
+
+
+```{r, fig.width=5, fig.height=4}
+recscal_plot <- recscal_sim[recscal_sim$Col == "B20", ]
+recscal_plot[, 1] <- - recscal_plot[, 1]
+# recscal_plot <- recscal_sim
+# recscal_plot[, 2] <- - recscal_plot[, 2]
+
+# png(file.path(figures_path, "visualize_niche.png"),
+#     bg = "transparent",
+#     res = 600,
+#     width = 9, height = 8, units = "cm")
+plot_reciprocal(recscal = recscal_plot, 
+                dudi = ca_sim,
+                group = "co", 
+                alpha = 0.5,
+                labsize = 0,
+                col = "darkgrey",
+                plot_arrows = FALSE, 
+                xlab = "", ylab = "",
+                ylim = c(-0.1, 1.7),
+                xlim = c(-0.1, 1.5),
+                # porigin.draw = FALSE,
+                pbackground.box = FALSE,
+                pbackground.col = "transparent",
+                pellipses.axes.lty = 2,
+                pellipses.axes.lwd = .5,
+                pellipses.axes.col = "black",
+                pgrid.draw = FALSE)
+# dev.off()
+```

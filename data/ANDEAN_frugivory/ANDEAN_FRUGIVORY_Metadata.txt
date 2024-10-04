@@ -1,0 +1,11 @@
+Network	Country	Latitude	Longitude	SamplingFocus	NumberSamplingMonths	SamplingHours	SamplingDesign	DataType	SamplingCoverage	Elevation_masl	Habitat	NumberOfInteractions	NumberOfBirdSpecies	NumberOfPlantSpecies
+Argentina	Argentina	-26.76	-65.33	PLANT	24	600	PLOT	visits	COMPLETE	1000	forest	1501	25	27
+Bolivia_edge	Bolivia	-16.4	-67.5	PLANT	21	768	PLOT	visits	COMPLETE	2500	forest_edge	567	41	31
+Bolivia_forest	Bolivia	-16.4	-67.5	PLANT	21	768	PLOT	visits	COMPLETE	2500	forest	238	22	18
+Colombia1	Colombia	4.72	-75.57	PLANT	12	600	PLOT	visits	COMPLETE	2000	forest	488	45	22
+Colombia2	Colombia	4.7	75.48	PLANT	12	600	PLOT	visits	COMPLETE	2500	forest	568	39	26
+Ecuador1	Ecuador	-4.1	-78.96	PLANT	24	300	PLOT	visits	COMPLETE	1000	forest	1842	51	26
+Ecuador2	Ecuador	-3.96	-79.06	PLANT	24	300	PLOT	visits	COMPLETE	2000	forest	603	38	20
+Ecuador3	Ecuador	-3.97	-79.07	PLANT	24	300	PLOT	visits	COMPLETE	3000	forest	84	13	20
+Peru1	Peru	-13.05	-71.54	PLANT	12	960	PLOT	visits	COMPLETE	1500	forest	4988	61	52
+Peru2	Peru	-13.17	-71.58	PLANT	12	720	PLOT	visits	COMPLETE	3000	forest	1344	26	51

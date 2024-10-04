@@ -1,0 +1,1007 @@
+---
+title: "Correspondence analysis and reciprocal scaling applied to an interaction network"
+format: 
+  html:
+    toc: true
+    toc-depth: 3
+editor: source
+date: today
+date-format: long
+author: 
+  - name: "Lisa Nicvert"
+    orcid: 0009-0006-5763-0865
+embed-resources: true
+code-fold: true
+params:
+  in_folder: "ANDEAN_Peru1"
+  min_freq: 2
+  presabs: false
+  log: false
+  colco: "darkred"
+  colli: "cornflowerblue"
+  nf_ca: 3
+  alpha: 0.05
+  selection: "LRT"
+bibliography: references.bib
+---
+
+```{r, message = FALSE}
+library(here) # path management
+
+# Data wrangling
+library(dplyr)
+library(tidyr)
+library(tibble)
+library(stringr)
+library(tidytext) # reorder_within
+library(effectsize) # Cramer's V
+
+# Ade4
+library(ade4)
+library(adegraphics)
+
+# Plot
+library(ggplot2)
+library(patchwork)
+library(viridisLite) # Color palette
+library(DT) # Display table
+
+# Graph stuff
+library(igraph)
+library(tidygraph)
+library(ggraph)
+
+# Custom package
+library(RSnetwork)
+
+set.seed(42)
+
+# Paths ---
+figures_path <- here("figures/04_data_analysis")
+output_path <- here("outputs/04_data_analysis")
+```
+
+## Parameters
+
+```{r}
+paste(names(params), params, sep = ": ")
+```
+
+## Prepare data
+
+### Read data
+
+We first read data that was cleaned before (from @dehling2021).
+
+```{r read_data}
+#|code-fold: show
+
+in_folder_type <- file.path(here("outputs/01_clean_data"))
+
+in_folder_full <- file.path(in_folder_type,
+                            params$in_folder)
+
+interactions_df <- read.csv(file.path(in_folder_full,
+                                    "interactions.csv"))
+plant_traits <- read.csv(file.path(in_folder_full,
+                                   "plant_traits.csv"))
+animal_traits <- read.csv(file.path(in_folder_full,
+                                    "animal_traits.csv"))
+```
+
+### Format data
+
+We remove some redundant traits (`BillLength` and `meanL`).
+
+```{r}
+# Remove "useless" traits
+animal_traits <- animal_traits |>
+  select(-BillLength)
+
+plant_traits <- plant_traits |>
+  select(-meanL)
+```
+
+Then, we remove the rows where there are `NA` in the traits.
+
+```{r filter_out_incomplete_traits}
+animal_traits <- animal_traits |>  
+  drop_na()
+
+plant_traits <- plant_traits |> 
+  drop_na()
+
+# Keep the table with traits for export
+animal_traits_codes <- animal_traits
+plant_traits_codes <- plant_traits
+```
+
+We format the interaction matrix and remove the column with species names.
+
+```{r format_data}
+#|code-fold: show
+
+interactions_full <- df_to_matrix(interactions_df)
+
+plant_traits <- plant_traits |> 
+  column_to_rownames("plant_species_code") |> 
+  select(-plant_species)
+
+animal_traits <- animal_traits |> 
+  column_to_rownames("animal_species_code") |> 
+  select(-animal_species)
+```
+
+The initial data matrix has `r dim(interactions_full)[1]` rows (plants) and `r dim(interactions_full)[2]` columns (birds).
+
+We remove plant and/or bird species that do not appear in the traits table.
+
+```{r filter_animals}
+# ---
+# Animals
+# ---
+final_animal_codes <- colnames(interactions_full) %in% rownames(animal_traits)
+
+if (!all(final_animal_codes)) { # If not all final_animal_codes are true
+  filtered_out_codes <- colnames(interactions_full)[!final_animal_codes]
+  filtered_out_names <- unique(interactions_df$animal_species[interactions_df$animal_species_code %in% filtered_out_codes])
+  
+  msg <- paste0(paste(filtered_out_names, filtered_out_codes, sep = " ("), ")")
+} else {
+  msg <- ""
+}
+
+interactions <- interactions_full[ , final_animal_codes]
+```
+
+The following animal(s) will be filtered out: `r msg`.
+
+```{r filter_plants}
+# ---
+# Plants
+# ---
+final_plant_codes <- rownames(interactions) %in% rownames(plant_traits)
+
+if (!all(final_plant_codes)) { # If not all final_animal_codes are true
+  filtered_out_codes <- rownames(interactions)[!final_plant_codes]
+  filtered_out_names <- unique(interactions_df$plant_species[interactions_df$plant_species_code %in% filtered_out_codes])
+  
+  msg <- paste0(paste(filtered_out_names, filtered_out_codes, sep = " ("), ")")
+} else {
+  msg <- ""
+}
+
+interactions <- interactions[final_plant_codes, ]
+```
+
+The following plant(s) will be filtered out: `r msg`.
+
+### Filter data
+
+Here we will filter the matrix so that each species interacts with `r params$min_freq` or more other species.
+
+```{r}
+interactions <- filter_matrix(mat = interactions, 
+                              thr = params$min_freq)
+```
+
+```{r reorder}
+animal_traits <- animal_traits[colnames(interactions),]
+plant_traits <- plant_traits[rownames(interactions),]
+```
+
+`params$presabs` is `r params$presabs` so we `r ifelse(params$presabs, "transform", "don't transform")` the data to presence-absence.
+
+```{r}
+interactions_orig <- interactions
+```
+
+```{r}
+if (params$presabs) {
+  interactions <- (interactions != 0)
+  interactions <- ifelse(interactions, 1, 0)
+  interactions <- as.data.frame(interactions)
+}
+```
+
+`params$log` is `r params$log` so we `r ifelse(params$log, "scale", "don't scale")` the data to log scale.
+
+```{r}
+if (params$log) {
+  interactions <- log(interactions + 1)
+}
+```
+
+Save data in a file:
+
+```{r}
+write.csv(interactions, file = file.path(output_path, "interactions.csv"))
+write.csv(animal_traits, file = file.path(output_path, "animal_traits.csv"))
+write.csv(plant_traits, file = file.path(output_path, "plant_traits.csv"))
+```
+
+### Characterize filtered out species
+
+Let's explore the profile of the birds/plants that were filtered out compared to the profiles of all birds/plants. Here, we look at the column sums (i.e. the marginal abundance). The aim is to see if the removed species were not only interacting with few species, but also rare.
+
+```{r}
+bird_names_out <- colnames(interactions_full)[!(colnames(interactions_full) %in% colnames(interactions))]
+bird_deg_out <- colSums(interactions_full[, bird_names_out])
+
+bird_deg_out <- data.frame(degree = bird_deg_out) |> 
+  rownames_to_column("bird")
+
+gout <- ggplot(bird_deg_out) +
+  geom_col(aes(x = reorder(bird, -degree), y = degree),
+           fill = params$colco) +
+  theme_linedraw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle("Filtered out birds abundance")
+
+bird_deg_full <- colSums(interactions_full)
+
+bird_deg_full <- data.frame(degree = bird_deg_full) |> 
+  rownames_to_column("bird")
+
+gall <- ggplot(bird_deg_full) +
+  geom_col(aes(x = reorder(bird, -degree), y = degree),
+           fill = params$colco) +
+  theme_linedraw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle("Birds abundance")
+
+gall + gout & 
+  scale_y_log10(limits = c(1, max(bird_deg_full$degree))) &
+  ylab("Weighted degree") &
+  theme(axis.title.x = element_blank())
+```
+
+```{r}
+plant_names_out <- rownames(interactions_full)[!(rownames(interactions_full) %in% rownames(interactions))]
+plant_deg_out <- rowSums(interactions_full[plant_names_out, ])
+
+plant_deg_out <- data.frame(degree = plant_deg_out) |> 
+  rownames_to_column("plant")
+
+gout <- ggplot(plant_deg_out) +
+  geom_col(aes(x = reorder(plant, -degree), y = degree),
+           fill = params$colli) +
+  theme_linedraw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle("Filtered out plants abundance")
+
+plant_deg_full <- rowSums(interactions_full)
+
+plant_deg_full <- data.frame(degree = plant_deg_full) |> 
+  rownames_to_column("plant")
+
+gall <- ggplot(plant_deg_full) +
+  geom_col(aes(x = reorder(plant, -degree), y = degree),
+           fill = params$colli) +
+  theme_linedraw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle("Plant abundance")
+
+gall + gout  & scale_y_log10(limits = c(1, max(plant_deg_full$degree))) &
+  ylab("Weighted degree") &
+  theme(axis.title.x = element_blank())
+```
+
+### Display data
+
+The matrix we will analyze has `r dim(interactions)[1]` rows (plants) and `r dim(interactions)[2]` columns (birds).
+
+Here is the original data matrix:
+
+```{r}
+interactions_df <- matrix_to_df(interactions, colnames = "birds")
+
+interactions_df_points <- interactions_df |> 
+    filter(value != 0)
+```
+
+```{r, fig.height=6, fig.width=8}
+if(params$log) {
+  msize <- max(interactions)*0.7
+} else {
+  msize <- max(interactions)*0.01
+}
+
+breaks <- c(1, 10, 100, 500)
+
+# Visualize filtered matrix
+plot_matrix(interactions, 
+            legend_title = ifelse(params$log, 
+                                  "ln(frequency)", "Frequency"), 
+            max_size = msize,
+            base_size = 9,
+            breaks = breaks,
+            trans = "log1p",
+            xlab = "Birds") +
+  theme(legend.key.width = unit(0.1, 'cm'),
+        axis.line.x.top = element_line(colour = params$colco, 
+                                       linewidth = 1),
+        axis.ticks.x.top = element_line(colour = params$colco),
+        axis.line.y = element_line(colour = params$colli, 
+                                   linewidth = 1),
+        axis.ticks.y = element_line(colour = params$colli))
+
+# Export plot
+ggsave(file.path(figures_path, "matrix.jpeg"),
+       width = 14, height = 12, 
+       dpi = 600, units = "cm", bg = "white")
+```
+
+```{r}
+# Create graph object
+g <- graph_from_biadjacency_matrix(interactions, weighted = TRUE)
+
+gtbl <- as_tbl_graph(g) |> 
+  activate(nodes) |> 
+  mutate(type = ifelse(type, "bird", "plant"))
+
+nodes <- V(g)
+
+# Reorder nodes as the original table
+co_reordered <- unname(rank(nodes[colnames(interactions)]))
+li_reordered <- unname(rank(nodes[rownames(interactions)]))
+
+# Create centered coordinates
+co_y <- scale(co_reordered, center = TRUE,
+              scale = FALSE)
+li_y <- scale(li_reordered, center = TRUE,
+              scale = FALSE)
+
+y <- cbind(c(li_y, co_y))
+x <- rep(c(0, 1), c(length(li_y), length(co_y)))
+lay <- data.frame(x, y)
+```
+
+```{r, fig.height=6, fig.width=8}
+gtbl <- gtbl |> 
+  mutate(degree = centrality_degree(weights = weight))
+
+ggraph(gtbl, layout = lay) +
+  geom_edge_fan(aes(width = weight),
+                alpha = 0.6,
+                show.legend = FALSE) +
+  scale_edge_width(range = c(.2, 2.5)) +
+  scale_color_manual(values = c(params$colco, params$colli)) +
+  geom_node_point(aes(col = type, size = degree),
+                  show.legend = FALSE) +
+  scale_size_area(max_size = 3, trans = "log") +
+  geom_node_text(aes(label = name), 
+                 show.legend = FALSE,
+                 size = 2.5,
+                 nudge_x = c(rep(-0.03, nrow(interactions)),
+                             rep(0.03, ncol(interactions)))) +
+  theme_void()
+```
+
+## Names and codes
+
+Below are the correspondences between species codes and their names:
+
+```{r, echo = FALSE}
+# Format data for display
+
+codes_plants <- plant_traits_codes |>  
+  mutate(plant_species = str_replace(plant_species, "_", " ")) |> 
+  filter(plant_species_code %in% rownames(interactions)) |> 
+  arrange(plant_species_code) |> 
+  rename("Code" = "plant_species_code", 
+         "Species name" = "plant_species",
+         "Fruit diameter (mm)" = "meanD1",
+         "Plant height (m)" = "meanHeight",
+         "Crop mass (g)" = "CropMass")
+
+codes_animals <- animal_traits_codes |> 
+  mutate(animal_species = str_replace(animal_species, "_", " ")) |> 
+  filter(animal_species_code %in% colnames(interactions)) |>
+  arrange(animal_species_code) |> 
+  rename("Code" = "animal_species_code", 
+         "Species name" = "animal_species",
+         "Kipp's index" = "KippsIndex",
+         "Bill width (mm)" = "BillWidth",
+         "Body mass (g)" = "Bodymass")
+
+codes_plants |> 
+  DT::datatable()
+
+codes_animals |>  
+  DT::datatable()
+```
+
+```{r}
+# Transform for LateX
+
+# Italicize
+codes_plants$`Species name` <- paste0("\\textit{", codes_plants$`Species name`, "}")
+codes_animals$`Species name` <- paste0("\\textit{", codes_animals$`Species name`, "}")
+
+# Add newline character
+codes_plants[, ncol(codes_plants)] <- paste0(codes_plants[, ncol(codes_plants)], "\\\\")
+colnames(codes_plants)[ncol(codes_plants)] <- paste0(colnames(codes_plants)[ncol(codes_plants)], "\\\\")
+
+codes_animals[, ncol(codes_animals)] <- paste0(codes_animals[, ncol(codes_animals)], "\\\\")
+colnames(codes_animals)[ncol(codes_animals)] <- paste0(colnames(codes_animals)[ncol(codes_animals)], "\\\\")
+```
+
+```{r}
+write.table(codes_plants, 
+            file = file.path(output_path, "codes_plants.csv"),
+            quote = FALSE, 
+            sep = " & ",
+            row.names = FALSE)
+write.table(codes_animals, 
+            file = file.path(output_path, "codes_animals.csv"),
+            quote = FALSE, 
+            sep = " & ",
+            row.names = FALSE)
+```
+
+## Correspondence analysis
+
+Let's first perform a chi-squared test to check if there is structure in the data.
+
+```{r}
+#| code-fold: show
+(chsq <- chisq.test(interactions, simulate.p.value = TRUE))
+
+(V <- cramers_v(interactions))
+```
+
+The p-value is `r round(chsq$p.value, 5)`.
+
+Now let's perform CA. For this analysis, we will keep `r params$nf_ca` axes.
+
+```{r compute_ca}
+#| code-fold: show
+ca <- dudi.coa(interactions, 
+                scannf = FALSE, 
+                nf = params$nf_ca)
+```
+
+CA eigenvalues and square root of eigenvalues:
+
+```{r}
+# Eigenvalues
+ca$eig
+
+# Square roots of eigenvalues
+sqrt(ca$eig)
+```
+
+Below are the corresponding eigenvalues graphs:
+
+```{r plot_eigen, fig.height=3, fig.width=5}
+plot_eig(ca$eig) + 
+  ggtitle("Eigenvalues") +
+  theme(axis.title.y = element_blank())
+
+plot_eig(sqrt(ca$eig)) + 
+  ggtitle("Square roots of eigenvalues") +
+  theme(axis.title.y = element_blank())
+
+plot_eig(cumsum(ca$eig)/sum(ca$eig)) +
+  ggtitle("Cumulative sum of relative eigenvalues") +
+  theme(axis.title.y = element_blank())
+```
+
+Below is the interaction matrix reordered with the first axis of the CA:
+
+```{r, fig.height=6, fig.width=8}
+interactions_reordered <- interactions[order(ca$li[, 1]),
+                                       order(ca$co[, 1])]
+
+plot_matrix(interactions_reordered, 
+            legend_title = ifelse(params$log, 
+                                  "ln(frequency)", "Frequency"), 
+            max_size = msize,
+            base_size = 9,
+            breaks = breaks,
+            trans = "log1p",
+            xlab = "Birds") +
+  theme(legend.key.width = unit(0.1, 'cm'),
+        axis.line.x.top = element_line(colour = params$colco,
+                                       # lineend = "butt",
+                                       linewidth = 1),
+        axis.ticks.x.top = element_line(colour = params$colco),
+        axis.line.y = element_line(colour = params$colli, 
+                                   # lineend = "square",
+                                   linewidth = 1),
+        axis.ticks.y = element_line(colour = params$colli))
+
+# Export plot
+ggsave(file.path(figures_path, "matrix_reordered.jpeg"),
+       width = 14, height = 12, 
+       dpi = 600, units = "cm", bg = "white")
+```
+
+```{r}
+# Reorder CA coordinates as the graph nodes
+co_reordered <- ca$co[nodes, 1]
+co_reordered <- co_reordered[!is.na(co_reordered)]
+
+li_reordered <- ca$li[nodes, 1]
+li_reordered <- li_reordered[!is.na(li_reordered)]
+
+# Get the ranks
+co_rank <- rank(ca$co[,1])
+li_rank <- rank(li_reordered)
+
+# Transformto centered coordinates
+co_y <- scale(co_rank, center = TRUE,
+              scale = FALSE)
+li_y <- scale(li_rank, center = TRUE,
+              scale = FALSE)
+
+y2 <- cbind(c(li_y, co_y))
+
+lay2 <- lay |> 
+  mutate(y = y2)
+```
+
+```{r, fig.height=6, fig.width=8}
+ggraph(gtbl, layout = lay2) +
+  geom_edge_fan(aes(width = weight),
+                alpha = 0.6,
+                show.legend = FALSE) +
+  scale_edge_width(range = c(.2, 2.5)) +
+  scale_color_manual(values = c(params$colco, params$colli)) +
+  geom_node_point(aes(col = type, size = degree),
+                  show.legend = FALSE) +
+  scale_size_area(max_size = 3, trans = "log") +
+  geom_node_text(aes(label = name), 
+                 show.legend = FALSE,
+                 size = 2.5,
+                 nudge_x = c(rep(-0.03, nrow(interactions)),
+                             rep(0.03, ncol(interactions)))) +
+  theme_void()
+```
+
+We can also rearrange the interaction matrix to highlight nestedless. For that, we arrange by decreasing weighted degree:
+
+```{r, fig.height=6, fig.width=8}
+interactions_nested <- interactions[order(rowSums(interactions)),
+                                    order(colSums(interactions))]
+
+plot_matrix(interactions_nested, 
+            legend_title = ifelse(params$log, 
+                                  "ln(frequency)", "Frequency"), 
+            max_size = msize,
+            base_size = 9,
+            breaks = breaks,
+            trans = "log1p",
+            xlab = "Birds") +
+  theme(legend.key.width = unit(0.1, 'cm'),
+        axis.line.x.top = element_line(colour = params$colco, 
+                                       linewidth = 1),
+        axis.ticks.x.top = element_line(colour = params$colco),
+        axis.line.y = element_line(colour = params$colli, 
+                                   linewidth = 1),
+        axis.ticks.y = element_line(colour = params$colli))
+```
+
+We can visualize the coordinates ordered along the axes and scan for gaps (as advised by @vandam2021):
+
+```{r}
+li_coord <- ca$li |> 
+  rownames_to_column("plant")
+  
+li_coord <- li_coord |>
+  pivot_longer(cols = 2:ncol(li_coord),
+               names_to = "axis")
+
+gli <- ggplot(li_coord) +
+  geom_point(aes(x = reorder_within(plant, by = value, within = axis, 
+                                    decreasing = TRUE), 
+                 y = value, group = axis),
+             col = params$colli) +
+  xlab("Plants")
+```
+
+```{r}
+co_coord <- ca$co |> 
+  rownames_to_column("bird")
+  
+co_coord <- co_coord |>
+  pivot_longer(cols = 2:ncol(co_coord),
+               names_to = "axis") |> 
+  mutate(axis = str_replace(axis, "Comp", "Axis"))
+
+gco <- ggplot(co_coord) +
+  geom_point(aes(x = reorder_within(bird, by = value, within = axis, 
+                                    decreasing = TRUE), 
+                 y = value, group = axis),
+             col = params$colco) +
+  xlab("Birds")
+```
+
+```{r, fig.width=8, fig.height=6}
+gli / gco  &
+  facet_grid(cols = vars(axis), scales = "free") &
+  ylab("Coordinate") &
+  theme_linedraw() &
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+```
+
+To plot the results in a biplot, there are two scalings available. They are depicted below.
+
+```{r plot_ca}
+xlim <- c(-6, 10)
+ylim <- c(-6, 10)
+multiplot(indiv_row = ca$li, indiv_col = ca$c1,
+          row_color = params$colli, col_color = params$colco, eig = ca$eig,
+          max.overlaps = 20,
+          xlim = xlim, ylim = ylim,
+          title = "Plants at the mean of birds (plants distances conserved)")
+
+multiplot(indiv_row = ca$li, indiv_col = ca$c1,
+          x = 2, y = 3,
+          row_color = params$colli, col_color = params$colco, eig = ca$eig,
+          max.overlaps = 20,
+          xlim = xlim, ylim = ylim,
+          title = "Plants at the mean of birds (plants distances conserved)")
+```
+
+```{r plot_ca2, fig.width=5, fig.height=5}
+xlim <- c(-6, 10)
+ylim <- c(-6, 10)
+
+multiplot(indiv_row = ca$l1, indiv_col = ca$co,
+          row_color = params$colli, col_color = params$colco, eig = ca$eig,
+          xlim = xlim, ylim = ylim,
+          title = "Birds at the mean of plants (birds distances conserved)")
+
+multiplot(indiv_row = ca$l1, indiv_col = ca$co,
+          x = 2, y = 3,
+          xlim = xlim, ylim = ylim,
+          row_color = params$colli, col_color = params$colco, eig = ca$eig,
+          title = "Birds at the mean of plants (birds distances conserved)")
+```
+
+## Reciprocal scaling
+
+We will now perform reciprocal scaling [@thioulouse1992].
+
+```{r recscal}
+#| code-fold: show
+recscal <- reciprocal.coa(ca)
+```
+
+```{r}
+multiplot(indiv_row = recscal,
+          indiv_row_lab = paste(recscal$Row, recscal$Col, sep = "-"),
+          eig = ca$eig,
+          alphapoints = 0.5)
+```
+
+This graph shows the correspondences of species interactions in the multivariate space. The correspondences are related to the CA coordinates as follows [@thioulouse1992]:
+
+$$h_k(i, j) = \frac{u^\star_{ik} + v^\star_{jk}}{\sqrt{2 \lambda_k \mu_k}}$$
+
+To put it differently, each correspondence is at the "mean" position between the `li`($L_k(i)$) and the `co` (scaled with a scaling factor).
+
+The standard deviations for plant species $i$ is [@thioulouse1992]:
+
+$$s_{ik} = \sqrt{\frac{1}{2\lambda_k\mu_k} \left( \frac{1}{y_{i \cdot}} \sum_{j = 1}^c \left(y_{ij} {v^\star_{jk}}^2 \right) - \lambda_k {u^\star_{ik}}^2 \right)}$$
+
+And the standard deviations for bird species $j$ is [@thioulouse1992]:
+
+$$s_{jk} = \sqrt{\frac{1}{2\lambda_k\mu_k} \left( \frac{1}{y_{\cdot j}} \sum_{i = 1}^r \left(y_{ij} {u^\star_{ik}}^2 \right) - \lambda_k {v^\star_{jk}}^2 \right)}$$
+NB: these standard deviations can also be computed directly as the standard deviations of the $h_k(i, j)$.
+
+
+The graphs below show plants and birds interaction niches in the multivariate space.
+
+```{r plot_recscal_li}
+# Create viridis palette for rows
+colrow <- viridis(nrow(interactions), option = "G", end = 0.9)
+
+# Order palette so that colors match position on axis 1
+colrow <- colrow[rank(ca$li[[1]])]
+
+# png(file.path(figures_path, "plant_ell.png"),
+#     bg = "white",
+#     res = 600,
+#     width = 15, height = 15, units = "cm")
+plot_reciprocal(recscal = recscal,
+                dudi = ca,
+                col = colrow,
+                group = "li",
+                xax = 1, yax = 2)
+# dev.off()
+
+plot_reciprocal(recscal = recscal,
+                dudi = ca,
+                col = colrow,
+                group = "li",
+                xax = 2, yax = 3)
+```
+
+```{r plot_recscal_co}
+# Create viridis palette for columns
+colco <- viridis(ncol(interactions), option = "F", end = 0.9)
+
+# Order palette so that colors match position on axis 1
+colco <- colco[rank(ca$co[[1]])]
+
+# png(file.path(figures_path, "birds_ell.png"),
+#     bg = "white",
+#     res = 600,
+#     width = 15, height = 15, units = "cm")
+plot_reciprocal(recscal = recscal, 
+                dudi = ca,
+                group = "co", 
+                xax = 1, yax = 2,
+                col = colco)
+# dev.off()
+
+plot_reciprocal(recscal = recscal, 
+                dudi = ca,
+                group = "co", 
+                xax = 2, yax = 3,
+                col = colco)
+```
+
+## Linear model
+
+Here we try to model niche width as a function of the position in the axes of the multivariate analysis.
+
+A linear model is also constructed and chosen as the best model between $$s_k = a~m_k + c $$ and $$s_k = a~m_k + b~m_k^2 + c$$
+
+```{r, warning = FALSE}
+ts <- 2.5 # labels size
+ps <- 1 # points size
+
+ax <- 1:3
+
+lmplots <- list()
+
+gbirds2 <- list()
+gplants2 <- list()
+
+lmbirds <- vector(mode = "list", length = length(ax))
+names(lmbirds) <- paste0("ax", ax, "_birds")
+
+lmplants <- vector(mode = "list", length = length(ax))
+names(lmplants) <- paste0("ax", ax, "_plants")
+
+msd <- get_mean_sd(recscal, ax = 1:params$nf_ca)
+```
+
+```{r, warning = FALSE}
+for(a in ax){
+  # Get the dataframes with mean/standard deviation for a given axis
+  msd_birds <- data.frame(birds = rownames(msd$colsd),
+                          mean = msd$colmean[, a],
+                          sd = msd$colsd[, a])
+  msd_plants <- data.frame(plants = rownames(msd$rowsd),
+                           mean = msd$rowmean[, a],
+                           sd = msd$rowsd[, a])
+  
+  # Linear models for birds ---
+  # Construct models
+  lmsimple <- lm(sd ~ mean, msd_birds)
+  lm2 <- lm(sd ~ mean + I(mean^2), msd_birds)
+  
+  # Get best model for birds
+  lmb <- get_best_model(lmsimple, lm2, alpha = params$alpha)
+  
+  lab_birds <- lm_labels(lmb, a)
+  
+  # Get predictions
+  pred <- "confidence"
+  birds_pred <- get_pred(dat_predict = msd_birds$mean, lmb, 
+                         interval = pred, level = 1 - params$alpha)
+  
+  # Linear models for plants ---
+  # Construct models
+  lmsimple <- lm(sd ~ mean, msd_plants)
+  lm2 <- lm(sd ~ mean + I(mean^2), msd_plants)
+  
+  # Get best model for plants
+  lmp <- get_best_model(lmsimple, lm2, alpha = params$alpha)
+
+  lab_plants <- lm_labels(lmp, a)
+  
+  # Get predictions
+  plants_pred <- get_pred(dat_predict = msd_plants$mean, lmp,
+                          interval = pred, level = 1 - params$alpha)
+  
+  # Merge datasets ---
+  msd_plants <- msd_plants |> 
+    rename("species" = "plants") |> 
+    mutate(type = "Plants")
+  msd_birds <- msd_birds |> 
+    rename("species" = "birds") |> 
+    mutate(type = "Birds")
+  msd_merge <- rbind(msd_plants, msd_birds)
+  
+  plants_pred <- plants_pred |> 
+    mutate(type = "Plants")
+  birds_pred <- birds_pred |> 
+    mutate(type = "Birds")
+  pred <- rbind(plants_pred, birds_pred)
+  
+  lab_df <- rbind(lab_birds, lab_plants)
+  lab_df$type <- c("Birds", "Plants")
+  
+  # Plots sd versus mean ---
+  lmplots[[a]] <- plot_lm_mean_sd(msd_merge, 
+                                  dat_pred = pred,
+                                  text_size = ts,
+                                  points_size = ps,
+                                  nudge_x = 0.1,
+                                  col = c(params$colco, params$colli), 
+                                  lab = lab_df,
+                                  ylab = paste0("Niche breadth (standard deviation on axis ", a, ")"), 
+                                  xlab = paste0("Niche optimum (mean position on axis ", a, ")"), 
+                                  facet = "type")
+  
+  lmbirds[[a]] <- lmb
+  lmplants[[a]] <- lmp
+  
+  # Plot sd versus number of interactions ---
+  gb2 <- ggplot() +
+    geom_point(aes(y = msd_birds$sd, x = colSums(interactions != 0)),
+               col = params$colco, alpha = 0.5) +
+    theme_linedraw() +
+    ggtitle(paste("Bird niche width versus number of interacting partners on axis", a)) +
+    xlim(c(0, max(colSums(interactions != 0))))
+  
+  gp2 <- ggplot() +
+    geom_point(aes(y = msd_plants$sd, x = rowSums(interactions != 0)),
+               col = params$colli, alpha = 0.5) +
+    theme_linedraw() +
+    ggtitle(paste("Plant niche width versus number of interacting partners on axis", a)) +
+    xlim(c(0, max(rowSums(interactions != 0))))
+  
+  gbirds2 <- c(gbirds2, list(gb2))
+  gplants2 <- c(gplants2, list(gp2))
+  
+}
+```
+
+```{r, fig.width=8, fig.height=4, warning = FALSE}
+lmplots[[1]] + 
+  ylim(0, 1.8) +
+  theme(plot.margin = margin(5, 10, 0, 5),
+        text = element_text(size = ts*3.5))
+# Export plot
+ggsave(file.path(figures_path, "lm_ax1.jpeg"),
+       width = 18, height = 8, 
+       dpi = 600, units = "cm", bg = "white")
+
+lmplots[[2]] + 
+  theme(plot.margin = margin(5, 10, 0, 5),
+        text = element_text(size = ts*3.5))
+# Export plot
+ggsave(file.path(figures_path, "lm_ax2.jpeg"),
+       width = 18, height = 8, 
+       dpi = 600, units = "cm", bg = "white")
+
+lmplots[[3]] + 
+  theme(plot.margin = margin(5, 10, 0, 5),
+        text = element_text(size = ts*3.5))
+```
+
+## Relationship with traits
+
+In order to interpret the axes, we can compute the correlations between the traits tables and the coordinates of birds/plants on each axis.
+
+```{r}
+corli <- cor(ca$li, plant_traits)
+corli <- t(corli)
+```
+
+```{r}
+corco <- cor(ca$co, animal_traits)
+corco <- t(corco)
+```
+
+Below is the a posteriori correlation circle between the axes and the traits:
+
+```{r}
+rownames(corli) <- c("fruit diameter", "plant height", "crop mass")
+rownames(corco) <- c("Kipp's index", "bill width", "body mass")
+
+plot_corcircle(cor = corli,
+               col = params$colli,
+               cor2 = corco,
+               lty = "longdash",
+               lty2 = "solid",
+               col2 = params$colco,
+               eig = ca$eig)
+ggsave(file.path(figures_path, "corcircle.svg"),
+       width = 15, height = 13, units = "cm")
+
+plot_corcircle(cor = corli,
+               col = params$colli,
+               xax = 2, yax = 3,
+               cor2 = corco,
+               lty = "solid",
+               lty2 = "longdash",
+               col2 = params$colco,
+               eig = ca$eig)
+```
+
+```{r}
+corli |> 
+  DT::datatable() |> 
+  DT::formatRound(1:ncol(corli), digits = 2)
+
+corco |> 
+  DT::datatable() |> 
+  DT::formatRound(1:ncol(corco), digits = 2)
+```
+
+## Linear model with residuals
+
+In this section, we construct linear models to predict the residuals of the regression of multivariate coordinates on known species traits. The aim is to look for a missing trait by examining the relationship between residuals and multivariate coordinates.
+
+### Plants (rows)
+
+We first construct the linear model predicting plants CA coordinates from their traits.
+
+```{r}
+#| code-fold: show
+
+lm_li <- apply(ca$li, MARGIN = 2, 
+               function(li) lm(li ~ plant_traits$meanHeight + plant_traits$CropMass + plant_traits$meanD1))
+
+names(lm_li) <- paste0("Ax", 1:length(lm_li))
+
+lapply(lm_li, summary)
+```
+
+Then, we pot the relationship between CA coordinates and the residuals of these models.
+
+```{r}
+res_list <- lapply(seq_along(lm_li), 
+                 function(i) data.frame(residuals = residuals(lm_li[[i]]), coord = ca$li[, i]))
+  
+for (i in 1:length(res_list)) {
+  dfi <- res_list[[i]]
+  
+  gp <- ggplot(dfi, aes(x = coord, y = residuals)) +
+    geom_point(col = params$colli) +
+    geom_smooth(method = "lm", col = params$colli) +
+    theme_linedraw() +
+    ggtitle(paste("Axis", i))
+  print(gp)
+}
+```
+
+### Birds (columns)
+
+We do the same for birds.
+
+```{r}
+#| code-fold: show
+
+lm_co <- apply(ca$co, MARGIN = 2, 
+               function(co) lm(co ~ animal_traits$Bodymass + animal_traits$BillWidth + animal_traits$KippsIndex))
+
+names(lm_co) <- paste0("Ax", 1:length(lm_co))
+
+lapply(lm_co, summary)
+```
+
+```{r}
+res_list <- lapply(seq_along(lm_co), 
+                 function(i) data.frame(residuals = residuals(lm_co[[i]]), coord = ca$co[, i]))
+  
+for (i in 1:length(res_list)) {
+  dfi <- res_list[[i]]
+  
+  gp <- ggplot(dfi, aes(x = coord, y = residuals)) +
+    geom_point(col = params$colco) +
+    geom_smooth(method = "lm", col = params$colco) +
+    theme_linedraw() +
+    ggtitle(paste("Axis", i))
+  print(gp)
+}
+```

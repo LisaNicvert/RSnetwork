@@ -1,0 +1,970 @@
+---
+title: "Evaluate reciprocal scaling with simulations"
+format: 
+  html:
+    toc: true
+    toc-depth: 3
+editor: source
+date: today
+date-format: long
+author: 
+  - name: "Lisa Nicvert"
+    orcid: 0009-0006-5763-0865
+embed-resources: true
+code-fold: true
+params:
+  colco: "darkred"
+  colli: "cornflowerblue"
+bibliography: references.bib
+---
+
+```{r, message=FALSE}
+library(here)
+
+library(ade4)
+library(adegraphics)
+
+library(ggplot2)
+library(patchwork)
+library(ggrepel)
+library(viridisLite)
+library(tibble)
+library(dplyr)
+library(tidyr)
+library(stringr)
+
+library(RSnetwork)
+
+# Paths ---
+figures_path <- here("figures/03_simulation/02_simulation")
+
+outputs_path <- here("outputs/03_simulation")
+```
+
+## Introduction and motivation
+
+This document evaluates the performance of reciprocal scaling [@thioulouse1992] to recover species interaction niches.
+
+We simulate data under our model, and we measure the agreement between the simulated and the inferred niches.
+
+## Parameters
+
+```{r}
+#| code-fold: show
+
+set.seed(43)
+
+# Simulation parameters
+sd_tol <- c(0.1, 1, 5, 10, 50)
+mean_tol <- c(2, 10, 20, 50)
+ninter <- c(200, 500, 5000, 10000)
+abund_distri <- c("1_unif", "2_skewlow", "3_skewmid", "4_skewhigh")
+
+nrep <- 2 # 100
+
+le_grad <- 100
+buffer <- 0
+ratio_grad <- 0.7
+
+delta_list <- c(0, 0.2, 1) 
+
+# Perform the simulation or load results?
+perform_simu <- FALSE
+
+# For plots
+stepgrad <- .5
+alpha_abund <- TRUE # make interactions in small matrices transparent?
+facsize <- 8 # factor for the size of the interactions in the small matrices
+alpharange <- c(0.4, 1)
+
+simu_files <- file.path(outputs_path, 
+                        paste0("simres_delta", delta_list, ".rds"))
+delta_names <- paste0("delta", delta_list)
+names(simu_files) <- delta_names
+```
+
+```{r}
+#| code-fold: show
+
+# Set default parameters
+nconsumer_def <- 60
+nresource_def <- 50
+ninter_def <- 5000
+abund_distri_def <- "3_skewmid"
+sd_tol_def <- 5
+mean_tol_def <- 10
+
+delta_def <- 0.2
+delta_def_name <- paste0("delta", delta_def)
+```
+
+```{r}
+# Set parameters for abundance distri
+lim_unif <- 100
+
+par1 <- c(0,
+          log(10), log(3), 0) # the median is exp(par1)
+par2 <- c(lim_unif,
+          log(1.5), log(1.5), log(10)) # CV is more or less sqrt(exp(sigma^2)-1)
+
+
+names(par1) <- abund_distri
+names(par2) <- abund_distri
+```
+
+Below are the abundance distribution functions:
+
+```{r, fig.height=6, fig.width=8}
+x <- seq(0, lim_unif, by = 0.01)
+
+glist <- list()
+for (t in names(par1)) {
+  if (t == "1_unif") {
+    y <- dunif(x, par1[t], par2[t])
+    tit <- paste0(t, " (min = ", par1[t], ", max = ", par2[t], ")")
+  } else {
+    tit <- paste0(t, " (meanlog = ", round(par1[t], 2), ", sdlog = ", round(par2[t], 2), ")")
+    y <- dlnorm(x, meanlog = par1[t], sdlog = par2[t])
+  }
+  
+  df <- data.frame(x = x, y = y)
+  g <- ggplot(df) +
+    geom_line(aes(x = x, y = y)) +
+    ggtitle(tit) +
+    theme_linedraw()
+  glist[[t]] <- g
+}
+
+wrap_plots(glist)
+```
+
+```{r}
+# Create parameters dataframes
+
+param_ninter <- data.frame(ninter = ninter,
+                           nconsumer = nconsumer_def,
+                           nresource = nresource_def,
+                           abund_distri = abund_distri_def,
+                           mean_tol = mean_tol_def,
+                           sd_tol = sd_tol_def,
+                           exp = "ninter")
+param_skew <- data.frame(ninter = ninter_def,
+                         nconsumer = nconsumer_def,
+                         nresource = nresource_def,
+                         abund_distri = abund_distri,
+                         mean_tol = mean_tol_def,
+                         sd_tol = sd_tol_def,
+                         exp = "abund_distri")
+param_meantol <- data.frame(ninter = ninter_def,
+                            nconsumer = nconsumer_def,
+                            nresource = nresource_def,
+                            abund_distri = abund_distri_def,
+                            mean_tol = mean_tol,
+                            sd_tol = mean_tol*1/2,
+                            exp = "mean_tol")
+param_sdtol <- data.frame(ninter = ninter_def,
+                          nconsumer = nconsumer_def,
+                          nresource = nresource_def,
+                          abund_distri = abund_distri_def,
+                          mean_tol = mean_tol_def,
+                          sd_tol =  sd_tol,
+                          exp = "sd_tol")
+
+paramdf <- rbind(param_ninter,
+                 param_skew,
+                 param_meantol,
+                 param_sdtol)
+
+paramdf <- paramdf |>
+  mutate(id = paste0("id", 1:nrow(paramdf)), .before = 1)
+```
+
+```{r}
+# Select the experiments for which delta should vary
+exp_vary_delta <- "ninter"
+```
+
+```{r}
+# Create a dataframe of legends for the plots
+legend_df <- data.frame(exp = unique(paramdf$exp))
+legend_df$legend <- c("Number of interactions",
+                      "Species abundance distribution",
+                      "Mean consumers niche breadth",
+                      "Standard deviation of consumers niche breadth")
+```
+
+## Simulations
+
+`perform_simu` is `r perform_simu` so the simulations will be `r ifelse(perform_simu, "performed", paste("loaded from the files", paste(basename(simu_files), collapse = ", ")))`.
+
+```{r}
+simres_list <- list()
+
+for (i in 1:length(delta_list)) {
+  delta <- delta_list[i]
+  print(paste("Delta", delta, "----------------"))
+  delta_name <- delta_names[i]
+  if (perform_simu) {
+    simres <- list("cor" = list("mean_cor" = data.frame(),
+                                "sd_cor" = data.frame(),
+                                "sd_area_cor" = data.frame()),
+                   "example" = list())
+    
+    rtime <- system.time({
+      if (delta == delta_def) {
+        # Do all simulations
+        jchoice <- 1:nrow(paramdf)
+      } else {
+        # Do only the ones in delta_vary
+        jchoice <- which(paramdf$exp %in% exp_vary_delta)
+      }
+      for(j in jchoice) {
+        # Simulation parameters ---
+        parms <- paramdf[j, ]
+        
+        print(paste0("Experiment ", parms$exp, " (", parms$id, ") ---"))
+        for(repi in 1:nrep) {
+          print(paste("Rep", repi))
+          
+          # parms$rep <- repi #  For debugging
+          
+          # Simulate data ---
+          
+          # Generate consumer and resource abundances 
+          # These abundances must be unsorted, because in the simulation
+          # algorithm we sort the resource following their traits and if the abundances
+          # are sorted as well it creates a correlation
+          
+          if (parms$abund_distri == "1_unif") {
+            consumerab <- runif(parms$nconsumer, par1[parms$abund_distri], par2[parms$abund_distri])
+            resourceab <- runif(parms$nresource, par1[parms$abund_distri], par2[parms$abund_distri])
+          } else {
+            consumerab <- rlnorm(parms$nconsumer, meanlog = par1[parms$abund_distri], 
+                             sdlog = par2[parms$abund_distri])
+            resourceab <- rlnorm(parms$nresource, meanlog = par1[parms$abund_distri], 
+                              sdlog = par2[parms$abund_distri])
+          }
+          
+          # Simulate data
+          sim <- compas2d(nconsumer = parms$nconsumer, 
+                          nresource = parms$nresource,
+                          le_grad = le_grad, 
+                          col_prefix = "b",
+                          row_prefix = "p",
+                          rowvar_prefix = "tp",
+                          remove_zeroes = TRUE,
+                          consumer_ab = consumerab,
+                          resource_ab = resourceab,
+                          ninter = parms$ninter,
+                          ratio_grad = ratio_grad,
+                          mean_tol = parms$mean_tol, 
+                          sd_tol = parms$sd_tol, 
+                          delta = delta,
+                          buffer = buffer)
+          
+          # Format simulated data ---
+          comm <- data.frame(sim$comm)
+          consumer_niche <- sim$colvar
+          
+          resource_traits <- data.frame(sim$rowvar)
+  
+          # Multivariate analyses ---
+          # CA
+          ca <- dudi.coa(comm, scannf = FALSE, nf = min(dim(comm)))
+          
+          # Reciprocal scaling
+          rec <- reciprocal.coa(ca)
+          
+          # Measure correlations between mean positions ---
+          res_niches <- get_niches(rec, consumer_niche = consumer_niche, 
+                                   resource_traits = resource_traits,
+                                   comm = comm,
+                                   rowname = "resources", colname = "consumers")
+          res <- get_cor(res_niches)
+          
+          ressim <- add_params(res, parms)
+          
+          # Get eigenvalues
+          neig <- 10 # We fix the number of eigevalues to 10, in case there are less eigenvalues there are NAs in the columns
+          ca_eig <- as.data.frame(t(ca$eig[1:neig]))
+          colnames(ca_eig) <- paste0("l", 1:neig)
+          ca_eig[, names(parms)] <- parms
+          
+          # Chi-squared test
+          sum_eig <- sum(ca$eig, na.rm = TRUE)
+          n_comm <- sum(comm)
+          testval <- chisq.test(comm, simulate.p.value = TRUE)
+          pval <- testval$p.value
+          
+          # Add these to the results
+          ca_eig$sum_eig <- sum_eig
+          ca_eig$n_comm <- n_comm
+          ca_eig$pval <- pval
+          
+          # Store results
+          simres$cor <- combine_cor(simres$cor, ressim)
+          
+          simres$eig <- rbind(simres$eig, ca_eig)
+        }
+        
+        # Keep one set of simulated data
+        simres$example[[parms$id]] <- sim
+      }
+    })
+    
+    # Save result
+    saveRDS(simres, file = simu_files[[delta_name]])
+    
+    # Store result in list
+    simres_list[[delta_name]] <- simres
+    
+    message(paste0("Output of system.time for delta = ", delta, ":"))
+    print(rtime)
+    
+    message("The simulation took ", 
+            round(rtime[3]/60, 2),
+            " minutes to run.")
+  } else { # Use stored object
+    for(delta in delta_list) {
+      simres_list[[delta_name]] <- readRDS(simu_files[[delta_name]])
+    }
+  }
+}
+```
+
+## Results
+
+### Explore one repetition
+
+We choose one of the simulation settings to visualize data (using $\delta =$ `r delta_def`).
+
+```{r}
+id <- "id3"
+paramdf[paramdf$id == id, ]
+```
+
+```{r}
+# Get corresponding data
+dat <- simres_list[[delta_def_name]]$example[[id]]
+
+# Store in shorter variable names
+comm <- as.data.frame(dat$comm)
+resource_traits <- dat$rowvar
+consumer_niche <- dat$colvar
+
+# Format consumer traits
+consumer_traits <- data.frame(consumer_niche[, "mean", ])
+colnames(consumer_traits) <- c("tb1", "tb2")
+
+# Perform multivariate analyses
+ca <- dudi.coa(comm, scannf = FALSE, nf = 2)
+rec <- reciprocal.coa(ca)
+```
+
+Interaction matrix:
+
+```{r, fig.width=8, fig.height=6}
+comm_reordered <- comm[order(ca$li[, 1]),
+                       order(ca$co[, 1])]
+
+plot_matrix(comm_reordered, 
+            max_size = 4) +
+  theme(legend.key.width= unit(0.1, 'cm'))
+```
+
+Visualize results in the multivariate space:
+
+```{r}
+limp <- c(-3, 3)
+multiplot(indiv_row = ca$li, indiv_col = ca$c1, 
+          col_color = params$colco, row_color = params$colli,
+          eig = ca$eig,
+          xlim = limp, ylim = limp)
+
+plot_reciprocal(recscal = rec, 
+                dudi = ca,
+                group = "li", 
+                col = params$colli,
+                xax = 1, yax = 2)
+plot_reciprocal(recscal = rec, 
+                dudi = ca,
+                group = "co",
+                col = params$colco,
+                xax = 1, yax = 2)
+```
+
+Visualize the correlation circle and eigenvalues for different values of $\delta$:
+
+```{r}
+for (i in 1:length(delta_list)) {
+  delta <- delta_list[i]
+  delta_name <- delta_names[i]
+  
+  simres <- simres_list[[delta_name]]
+  
+  # Get corresponding data
+  dat <- simres$example[[id]]
+  
+  # Store in shorter variable names
+  comm <- as.data.frame(dat$comm)
+  resource_traits <- dat$rowvar
+  consumer_niche <- dat$colvar
+  
+  # Format consumer traits
+  consumer_traits <- data.frame(consumer_niche[, "mean", ])
+  colnames(consumer_traits) <- c("tb1", "tb2")
+  
+  # Perform multivariate analyses
+  ca <- dudi.coa(comm, scannf = FALSE, nf = 2)
+  rec <- reciprocal.coa(ca)
+  
+  # Plot
+  corli <- cor(ca$li, resource_traits)
+  corli <- t(corli)
+  
+  corco <- cor(ca$co, consumer_traits)
+  corco <- t(corco)
+  
+  corplot <- plot_corcircle(corli, corco, 
+                            col = params$colli,
+                            col2 = params$colco) 
+  
+  barplot <- plot_eig(ca$eig)
+  
+  res <- wrap_plots(corplot, barplot) +
+    plot_annotation(paste("delta = ", delta))
+  print(res)
+}
+```
+
+### Results of all simulations
+
+Here, we summarize the results for all simulations.
+
+```{r}
+dfmean_list <- lapply(simres_list, function(x) x$cor$realized$mean_cor)
+dfsd_list <- lapply(simres_list, function(x)  x$cor$realized$sd_cor)
+
+dfsd_fu_list <- lapply(simres_list, function(x) x$cor$fundamental$sd_cor)
+dfmean_fu_list <- lapply(simres_list, function(x) x$cor$fundamental$mean_cor)
+```
+
+```{r}
+# Prepare plotting parameters
+
+# Spacing between legend keys
+keyspacing <- list("ninter" = 0.11,
+                   "abund_distri" = c(0.06, 0.08, 0.08, 0),
+                   "mean_tol" = c(0.13, 0.12, 0.12, 0),
+                   "sd_tol" = c(0.08, 0.09, 0.1, 0.08, 0))
+
+# Custom labels for abundance distribution
+lab_abund_distri <- c("1_unif" = "uniform",
+                      "2_skewlow" = "moderate\nskew",
+                      "3_skewmid" = "medium\nskew", 
+                      "4_skewhigh" = "high skew")
+```
+
+#### Plot results
+
+```{r, fig.height=8, fig.width=6}
+# Boxplots
+deltaplot_list <- list()
+
+for (i in 1:length(delta_list)) { # delta
+  boxplots_list <- list()
+  
+  delta <- delta[i]
+  delta_name <- delta_names[i]
+  
+  dfmean <- dfmean_list[[delta_name]]
+  dfsd <- dfsd_list[[delta_name]]
+  for(exp_plot in unique(dfmean$exp)) { # experiments
+    # Get correlation values for mean and sd
+    dfmean_exp <- dfmean |> 
+      filter(exp == exp_plot)
+    dfsd_exp <- dfsd |> 
+      filter(exp == exp_plot)
+    
+    legend_title <- legend_df$legend[legend_df$exp == exp_plot]
+    
+    # ---
+    # Plot matrices
+    # ---
+    
+    # Get ids to plot
+    # We get the correspondence between ids and the parameter that changes
+    fac_ids <- unique(dfmean_exp[, c("id", exp_plot)])
+    # Sort to match the facter order
+    sortfac <- order(factor(fac_ids[[exp_plot]]))
+    ids <- fac_ids$id[sortfac]
+    
+    # Get color palette
+    pal <- viridis(n = length(ids), 
+                   begin = 0, end = 0.8, option = "D")
+    names(pal) <- fac_ids[, 2]
+    
+    # Get corresponding data
+    dats <- simres_list[[delta_name]]$example[ids]
+    
+    # Get plots widths/heights
+    dims <- lapply(dats, function(x) dim(x$comm))
+    heights <- sapply(dims, function(x) x[1])
+    widths <- sapply(dims, function(x) x[2])
+    
+    # Get abundances and quantiles
+    abds <- sapply(dats, function(x) max(x$comm[x$comm != 0]))
+    cbounds <- sapply(dats, 
+                      function(x) quantile(x$comm[x$comm != 0], 
+                                           probs = c(0.01, 0.99)))
+    colnames(cbounds) <- ids
+    
+    gmatlist <- list()
+    for (id in ids) {
+      # Get corresponding data
+      dat <- dats[[id]]
+      comm <- as.data.frame(dat$comm)
+      
+      # Get the factor
+      exp_fac <- fac_ids[fac_ids$id == id, exp_plot]
+      
+      # Get the color
+      colid <- pal[as.character(fac_ids[fac_ids$id == id, 2])]
+      
+      # Perform multivariate analyses
+      ca <- dudi.coa(comm, scannf = FALSE, nf = 2)
+      comm_reordered <- comm[order(ca$li[, 1]),
+                         order(ca$co[, 1])]
+  
+      # Censor data
+      comm_reordered[comm_reordered >= max(cbounds[2, ])] <- max(cbounds[2, ])
+      comm_reordered[comm_reordered <= min(cbounds[1, ]) & comm_reordered != 0] <- min(cbounds[1, ])
+      
+      # Get the max of censored data
+      abd_max <- max(comm_reordered[comm_reordered != 0])
+      
+      gmat <- plot_matrix(comm_reordered, 
+                          max_size = (abd_max/max(cbounds))*facsize,
+                          alpha = alpha_abund, 
+                          col = colid) +
+        theme(axis.text = element_blank(),
+              axis.text.x.top = element_blank(),
+              axis.title = element_blank(),
+              axis.ticks = element_blank(),
+              plot.margin = margin(t = 0, r = 10, 
+                                   b = 0, l = 10, 
+                                   unit = "pt"),
+              panel.border = element_rect(colour = colid, 
+                                          linewidth = 1),
+              legend.position="none")
+      if (alpha_abund) {
+        gmat <- gmat +
+          scale_alpha(range = c(alpharange[1], alpharange[2]))
+      }
+
+      
+      gmatlist <- c(gmatlist, list(gmat))
+    }
+    
+    # ---
+    # Plot boxplots
+    # ---
+    facet_lab <- c("resources" = "Resources", "consumers" = "Consumers")
+    g1 <- ggplot(dfmean_exp) +
+      ggtitle("Niche optima (CA ordination)")
+    
+    g2 <- ggplot(dfsd_exp) +
+      ggtitle("Niche breadth (standard deviation)")
+    
+    boxplots <- g1 / g2 + 
+      plot_layout(guides = 'collect') & ylim(c(0, 1)) &
+      geom_boxplot(aes(y = cor, group = interaction(axis, .data[[exp_plot]], type), 
+                       x = axis,
+                       col = factor(.data[[exp_plot]]))) &
+      guides(colour = guide_legend(title.position = "top")) &
+      facet_grid(cols = vars(type), 
+                 labeller = as_labeller(facet_lab)) &
+      scale_x_discrete(labels = c("1" = "Axis 1", "2" = "Axis 2")) &
+      theme_linedraw() &
+      ylab("Correlation (absolute value)") &
+      theme(legend.position = 'bottom',
+            axis.title.x = element_blank(),
+            legend.text = element_text(hjust = 0.5),
+            legend.key.width = unit(0.05, "npc"),
+            legend.key.spacing.x = unit(keyspacing[[exp_plot]], "npc"),
+            legend.justification = "center",
+            strip.background = element_rect(fill = "white"),
+            strip.text = element_text(color = "black"))
+    
+    if (exp_plot == "abund_distri") {
+      # Change labels 
+      boxplots <- boxplots &
+        scale_color_manual(legend_title, 
+                           labels = lab_abund_distri,
+                           values = pal)
+    } else {
+      boxplots <- boxplots & 
+        scale_color_manual(legend_title,
+                           values = pal)
+    }
+    
+    matplots <- wrap_plots(gmatlist, nrow = 1,
+                           heights = heights, 
+                           widths = widths)
+    
+    boxplots <- boxplots / guide_area() / 
+      wrap_elements(matplots) + 
+      plot_layout(heights = c(3, 3, .5, 1.5))
+    boxplots_list[[exp_plot]] <- boxplots
+  }
+  deltaplot_list[[delta_name]] <- boxplots_list
+}
+```
+
+```{r, fig.height=8, fig.width=6}
+for (i in 1:length(delta_list)) {
+  delta <- delta_list[i]
+  delta_name <- delta_names[i]
+  
+  boxplots_list <- deltaplot_list[[delta_name]]
+  
+  print(paste("delta =", delta, "----------------------------"))
+  
+  for (n in names(boxplots_list)) {
+    print(boxplots_list[[n]])
+    ggsave(file.path(figures_path, paste0("boxplots_delta", delta, "_",
+                                          n, ".png")),
+         width = 15, height = 18,
+         units = "cm",
+         dpi = 600)
+  }
+}
+```
+
+## Supplementary material
+
+### Eigenvalue evolution
+
+We check how eigenvalues change depending on $n_{\text{inter}}$ for different values of $\delta$.
+
+```{r}
+# Get the eigenvalues
+eigval <- lapply(simres_list, function(x) x$eig)
+
+# Add delta to the df
+eigval <- lapply(seq_along(eigval), 
+                 function(i) eigval[[i]] |> 
+                   mutate(delta = names(eigval)[i]))
+
+# Add the repetition
+eigval <- lapply(eigval, 
+                 function(x) x |>  mutate(rep = 1:nrow(x)))
+
+# Format data
+eigval_df_wide <- do.call("rbind", eigval)
+
+eigval_df_wide <- eigval_df_wide |> 
+  mutate(delta = gsub("delta", "", delta))
+eigval_df_wide$delta <- as.numeric(eigval_df_wide$delta)
+
+eigval_df <- eigval_df_wide |> 
+  pivot_longer(cols = matches("^l\\d*$"), 
+               names_to = "eig_name",
+               values_to = "eig_value")
+
+# lambda to factors
+lambda_levels <- unique(eigval_df$eig_name)
+lambda_sort <- as.numeric(stringr::str_replace(lambda_levels, "^l", ""))
+lambda_levels <- lambda_levels[order(lambda_sort)]
+
+eigval_df$eig_name <- factor(eigval_df$eig_name,
+                             levels = lambda_levels)
+```
+
+```{r}
+# Choose experiment 
+exp_plot <- "ninter"
+
+# Filter
+eigval_df_summary <- eigval_df |> 
+  filter(exp == exp_plot)
+  
+# Summarize with median and quantiles
+eigval_df_summary <- eigval_df_summary |> 
+  group_by(id, delta, ninter, eig_name) |> 
+  mutate(sq_eig = sqrt(eig_value)) |> 
+  summarize(median = median(sq_eig, na.rm = TRUE),
+            inf = quantile(sq_eig, 0.025, na.rm = TRUE),
+            sup = quantile(sq_eig, 0.975, na.rm = TRUE),
+            .groups = "drop")
+
+# Add mean tolerance values
+to_add <- paramdf[, c("id", exp_plot)]
+
+eigval_df_summary <- eigval_df_summary |> 
+  left_join(to_add)
+```
+
+```{r}
+# ggsave doesn't work with formulas in axes
+# png(file.path(figures_path,
+#               paste0("lambda_evolution_ninter.png")),
+#     width = 20, height = 7.5,
+#     units = "cm",
+#     res = 300)
+ggplot(eigval_df_summary, aes(x = factor(ninter), group = eig_name)) +
+  geom_errorbar(aes(ymin = inf, ymax = sup, col = eig_name),
+                width = 0.02) +
+  geom_line(aes(y = median, col = eig_name), 
+            linetype = "dashed") +
+  geom_point(aes(y = median, col = eig_name)) +
+  scale_color_viridis_d() +
+  theme_linedraw() +
+  xlab("Number of interactions") +
+  ylab(expression(sqrt(lambda[k]))) +
+  facet_grid(cols = vars(delta),
+             labeller = label_bquote(cols = delta == .(delta))) +
+  theme(legend.position = "none",
+        strip.background = element_rect(fill = "white"),
+        strip.text = element_text(color = "black", size = 11),
+        axis.title = element_text(size = 11))
+# dev.off()
+```
+
+```{r}
+alpha <- 0.05
+
+# Compute intermediate sum of eigenvalues
+chisq_summary <- eigval_df_wide |> 
+  mutate(sum_eig_n = sum_eig*n_comm)
+
+# Filter
+chisq_summary <- chisq_summary |> 
+  filter(exp == exp_plot)
+
+# Test pvalue
+chisq_summary <- chisq_summary |> 
+  group_by(id, ninter, delta) |> 
+  mutate(p_adjusted = p.adjust(pval, method = "holm", n = nrep)) |> 
+  mutate(signif = as.numeric(p_adjusted <= alpha))
+
+# Summarize with median, quantiles and proportion of significant pvalues
+chisq_summary <- chisq_summary |> 
+  group_by(id, ninter, delta) |> 
+  summarize(median = median(sum_eig_n),
+            inf = quantile(sum_eig_n, 0.025),
+            sup = quantile(sum_eig_n, 0.975),
+            prop_p = sum(signif)/n(),
+            .groups = "drop")
+
+chisq_summary <- chisq_summary |> 
+  left_join(to_add)
+```
+
+```{r, fig.width=8, fig.height=3}
+ggplot(chisq_summary, aes(x = factor(ninter))) +
+  geom_errorbar(aes(ymin = inf, ymax = sup, col = prop_p),
+                width = 0.02) +
+  geom_line(aes(y = median, group = delta), 
+            linetype = "dashed") +
+  geom_point(aes(y = median, col = prop_p)) +
+  scale_color_viridis_c(direction = -1, begin = 0.1, end = 1,
+                        name = "Prop. signif. p-values") +
+  theme_linedraw() +
+  xlab("Number of interactions") +
+  ylab(expression(Chi^2)) +
+  facet_grid(cols = vars(delta),
+             labeller = label_bquote(cols = delta == .(delta))) +
+  theme(legend.position = "bottom",
+        strip.background = element_rect(fill = "white"),
+        strip.text = element_text(color = "black"))
+```
+
+### Fundamental vs realized niches
+
+Here, we compare the performance of reciprocal scaling to infer either the fundamental or the realized niches.
+
+```{r}
+# Prepare data
+delta_ind <- 2
+delta <- delta_list[delta_ind]
+delta_name <- delta_names[delta_ind]
+simres <- simres_list[[delta_name]]
+
+# Choose taxonomic level
+level <- "consumers"
+
+# Filter only consumers niches from realized niches above and rename type
+dfsd_re <- dfsd_list[[delta_name]] |> 
+  filter(type == level) |> 
+  mutate(type = "realized")
+dfmean_re <- dfmean_list[[delta_name]] |> 
+  filter(type == level) |> 
+  mutate(type = "realized")
+
+# Rename type
+dfsd_fu <- dfsd_fu_list[[delta_name]] |> 
+  filter(type == level) |> 
+  mutate(type = "fundamental")
+dfmean_fu <- dfmean_fu_list[[delta_name]] |> 
+  filter(type == level) |> 
+  mutate(type = "fundamental")
+
+# Merge table
+dfsd_level <- rbind(dfsd_re, dfsd_fu)
+dfmean_level <- rbind(dfmean_re, dfmean_fu)
+
+# Reorder levels
+dfsd_level$type <- factor(dfsd_level$type, 
+                           levels = c("realized", "fundamental"))
+dfmean_level$type <- factor(dfmean_level$type, 
+                            levels = c("realized", "fundamental"))
+```
+
+```{r}
+boxplots_list <- list()
+
+for(exp_plot in unique(dfsd_level$exp)) {
+  dfsd_exp <- dfsd_level |> 
+    filter(exp == exp_plot)
+  dfmean_exp <- dfmean_level |> 
+    filter(exp == exp_plot)
+  
+  legend_title <- legend_df$legend[legend_df$exp == exp_plot]
+  
+  # ---
+  # Plot matrices
+  # ---
+  # Get ids to plot
+  # We get the correspondence between ids and the parameter that changes
+  fac_ids <- unique(dfsd_exp[, c("id", exp_plot)])
+  # Sort to match the factor order
+  sortfac <- order(factor(fac_ids[[exp_plot]]))
+  ids <- fac_ids$id[sortfac]
+  
+  # Get corresponding data
+  dats <- simres$example[ids]
+  
+  # Get color palette
+  pal <- viridis(n = length(ids), 
+                 begin = 0, end = 0.8, option = "D")
+  names(pal) <- fac_ids[, 2]
+    
+  # Get plots widths/heights
+  dims <- lapply(dats, function(x) dim(x$comm))
+  heights <- sapply(dims, function(x) x[1])
+  widths <- sapply(dims, function(x) x[2])
+  
+  # Get abundances and quantiles
+  abds <- sapply(dats, function(x) max(x$comm[x$comm != 0]))
+  cbounds <- sapply(dats, 
+                    function(x) quantile(x$comm[x$comm != 0], 
+                                         probs = c(0.01, 0.99)))
+  colnames(cbounds) <- ids
+  
+  gmatlist <- list()
+  for (id in ids) {
+    # Get corresponding data
+    dat <- dats[[id]]
+    comm <- as.data.frame(dat$comm)
+    
+    # Get the color
+    colid <- pal[as.character(fac_ids[fac_ids$id == id, 2])]
+    
+    # Get the factor
+    exp_fac <- fac_ids[fac_ids$id == id, exp_plot]
+    
+    # Perform multivariate analyses
+    ca <- dudi.coa(comm, scannf = FALSE, nf = 2)
+    comm_reordered <- comm[order(ca$li[, 1]),
+                       order(ca$co[, 1])]
+    
+    # Censor data
+    comm_reordered[comm_reordered >= max(cbounds[2, ])] <- max(cbounds[2, ])
+    comm_reordered[comm_reordered <= min(cbounds[1, ]) & comm_reordered != 0] <- min(cbounds[1, ])
+      
+    gmat <- plot_matrix(comm_reordered, 
+                        max_size = abds[id]/max(abds)*facsize,
+                        alpha = alpha_abund,
+                        col = colid) +
+      theme(axis.text = element_blank(),
+            axis.text.x.top = element_blank(),
+            axis.title = element_blank(),
+            axis.ticks = element_blank(),
+            plot.margin = margin(t = 0, r = 10, 
+                                 b = 0, l = 10, 
+                                 unit = "pt"),
+            panel.border = element_rect(colour = colid, 
+                                        linewidth = 1),
+            legend.position="none")
+    
+    gmatlist <- c(gmatlist, list(gmat))
+  }
+  
+  # ---
+  # Plot boxplots
+  # ---
+  g1 <- ggplot(dfmean_exp) +
+      ggtitle("Niche optima (CA ordination)")
+    
+  g2 <- ggplot(dfsd_exp) +
+    ggtitle("Niche breadth (standard deviation)")
+
+  facet_lab <- c("realized" = "Realized niche", "fundamental" = "Fundamental niche")
+  boxplots <- g1 / g2 + 
+    plot_layout(guides = 'collect') & 
+    ylim(c(0, 1)) &
+    geom_boxplot(aes(y = cor, group = interaction(axis, type, .data[[exp_plot]]), 
+                     x = factor(axis),
+                     col = factor(.data[[exp_plot]]))) &
+    guides(colour = guide_legend(title.position = "top")) &
+    scale_x_discrete(labels = c("1" = "Axis 1", "2" = "Axis 2")) &
+    facet_grid(cols = vars(type), 
+               labeller = as_labeller(facet_lab)) &
+    theme_linedraw() &
+    ylab("Correlation (absolute value)") &
+    theme(legend.position = 'bottom',
+          axis.title.x = element_blank(),
+          legend.key.width = unit(0.05, "npc"),
+          legend.key.spacing.x = unit(keyspacing[[exp_plot]], "npc"),
+          legend.justification = "center",
+          strip.background = element_rect(fill = "white"),
+          strip.text = element_text(color = "black"))
+  
+  if (exp_plot == "abund_distri") {
+    # Change labels 
+    boxplots <- boxplots &
+      scale_color_manual(legend_title, 
+                         labels = lab_abund_distri,
+                         values = pal)
+    } else {
+      boxplots <- boxplots & 
+        scale_color_manual(legend_title,
+                           values = pal)
+    }
+  
+  matplots <- wrap_plots(gmatlist, nrow = 1,
+                         heights = heights, 
+                         widths = widths)
+  
+  boxplots <- boxplots / guide_area() / 
+    wrap_elements(matplots) + 
+    plot_layout(heights = c(3, 3, .5, 1.5))
+  
+  boxplots_list[[exp_plot]] <- boxplots
+  
+}
+```
+
+```{r, fig.height=8, fig.width=6}
+for (n in names(boxplots_list)) {
+  print(boxplots_list[[n]])
+  ggsave(file.path(figures_path,
+                   paste0("re_fu_boxplots_delta",
+                          delta, "_",
+                          n, ".png")),
+         width = 15, height = 18,
+         units = "cm",
+         dpi = 600)
+}
+```
