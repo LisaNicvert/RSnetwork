@@ -23,8 +23,12 @@ The datasets contained in the `data/` folder come from a published datasets by D
 
 ## Running analyses
 
-This repository contains a R package `RSnetwork`. To run the analyses, first install this package by running the following command in the R console (from the code folder copied on your computer) : 
+This repository contains a R package `RSnetwork`. To run the analyses, first install dependencies. To mamage dependencies, this package uses [renv](https://rstudio.github.io/renv/index.html) and the same versions of the dependencies used for these analyses can be installed from the `renv.lock` file using:
+```{r}
+renv::restore()
+```
 
+Then, install the custom `RSnetwork` package with:
 ```{r}
 devtools::install_local()
 ```
