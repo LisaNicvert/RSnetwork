@@ -7,3 +7,4 @@
 ^outputs/*
 ^install_dependencies\.R$
 ^RSnetwork.*\.pdf$
+^\.gitattributes$
