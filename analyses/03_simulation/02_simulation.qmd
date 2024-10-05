@@ -60,7 +60,7 @@ mean_tol <- c(2, 10, 20, 50)
 ninter <- c(200, 500, 5000, 10000)
 abund_distri <- c("1_unif", "2_skewlow", "3_skewmid", "4_skewhigh")
 
-nrep <- 2 # 100
+nrep <- 100
 
 le_grad <- 100
 buffer <- 0
@@ -425,7 +425,8 @@ for (i in 1:length(delta_list)) {
   corco <- cor(ca$co, consumer_traits)
   corco <- t(corco)
   
-  corplot <- plot_corcircle(corli, corco, 
+  corplot <- plot_corcircle(cor = corli, 
+                            cor2 = corco, 
                             col = params$colli,
                             col2 = params$colco) 
   

@@ -30,7 +30,7 @@ renv::restore()
 
 Then, install the custom `RSnetwork` package with:
 ```{r}
-devtools::install_local()
+devtools::install_local(upgrade = "never")
 ```
 
 Then, you can run the analyses from the `analyses/` folder.
