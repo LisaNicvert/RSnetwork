@@ -19,14 +19,14 @@ The datasets contained in the `data/` folder come from a published datasets by D
 -   `DESCRIPTION` contains the project metadata (author, date, dependencies, etc.)
 -   `NAMESPACE` contains the namespace information for the functions in the `R/` folder.
 -   `LICENCE.md` contains the full licence for the R code.
--   `install_dependencies.R` is a R script to install all R libraries.
 
 ## Running analyses
 
-This repository contains a R package `RSnetwork`. To run the analyses, first install dependencies. To mamage dependencies, this package uses [renv](https://rstudio.github.io/renv/index.html) and the same versions of the dependencies used for these analyses can be installed from the `renv.lock` file using:
+To manage dependencies, this package uses [renv](https://rstudio.github.io/renv/index.html): R version and dependencies are stored in the `renv.lock` file and can be installed in a local project library using:
 ```{r}
 renv::restore()
 ```
+The installed packages will not replace the packages from your R library, but will be installed and used for this project only.
 
 Then, install the custom `RSnetwork` package with:
 ```{r}
