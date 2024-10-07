@@ -37,26 +37,12 @@ library(RSnetwork)
 figures_path <- here("figures/03_simulation/01_example_simulation")
 ```
 
-
-```{r}
-cfun <- function(a, b) {
-  res <- list("mean_cor" = data.frame(),
-              "var_cor" = data.frame(),
-              "var_area_cor" = data.frame())
-  
-  res$mean_cor <- rbind(a$mean_cor, b$mean_cor)
-  res$var_cor <- rbind(a$var_cor, b$var_cor)
-  res$var_area_cor <- rbind(a$var_area_cor, b$var_area_cor)
-  return(res)
-}
-```
-
 ## Simulation parameters
 
 ```{r}
 set.seed(12)
 
-# Simulation parameters ---
+# Simulation parameters ---s
 nbird <- 12
 nplant <- 8
 ninter <- 300

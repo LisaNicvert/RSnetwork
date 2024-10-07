@@ -112,9 +112,14 @@
     },
     "ade4": {
       "Package": "ade4",
-      "Version": "1.7-22",
-      "Source": "Repository",
-      "Repository": "CRAN",
+      "Version": "1.7-23",
+      "Source": "GitHub",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteUsername": "adeverse",
+      "RemoteRepo": "ade4",
+      "RemoteRef": "master",
+      "RemoteSha": "69227a194686592105365d47c1d848d3a7e83de8",
       "Requirements": [
         "MASS",
         "R",
@@ -128,7 +133,7 @@
         "stats",
         "utils"
       ],
-      "Hash": "9768be866e8e02810e94ceb95b32b367"
+      "Hash": "4500500b17c36a4362bba3b437c50374"
     },
     "adegraphics": {
       "Package": "adegraphics",

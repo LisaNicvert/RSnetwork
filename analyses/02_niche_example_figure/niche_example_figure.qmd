@@ -59,7 +59,7 @@ plot_matrix(mat_reordered, max_size = 4)
 ```
 
 ```{r}
-recscal_sim <- RSnetwork::reciprocal.coa(ca_sim)
+recscal_sim <- reciprocal.coa(ca_sim)
 ```
 
 
