@@ -29,10 +29,12 @@ renv::restore()
 ```
 The installed packages will not replace the packages from your R library, but will be installed and used for this project only.
 
-Then, install the custom `RSnetwork` package (note: you need to have `devtools` installed):
+Then, install the custom `RSnetwork` package with:
 ```{r}
+renv::install("devtools")
 devtools::install_local(upgrade = "never")
 ```
+(Note: if you already have `devtools` installed, this `renv::install("devtools")` will only link your version to the project library, else it will install the latest version available on CRAN).
 
 Then, you can run the analyses from the `analyses/` folder.
 
