@@ -7,7 +7,7 @@
 add_params(corsim, paramvec)
 }
 \arguments{
-\item{corsim}{a list with the correlation values (output of \code{\link[=get_cor]{get_cor()}}).}
+\item{corsim}{a list with the correlation values (output of \code{\link{get_cor}}).}
 
 \item{paramvec}{A vector of parameters (must be a 1-row dataframe)}
 }

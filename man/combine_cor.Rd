@@ -7,14 +7,14 @@
 combine_cor(a, b)
 }
 \arguments{
-\item{a}{First list formatted by \code{\link[=get_cor]{get_cor()}}}
+\item{a}{First list formatted by \code{\link{get_cor}}}
 
-\item{b}{Second list formatted by \code{\link[=get_cor]{get_cor()}}}
+\item{b}{Second list formatted by \code{\link{get_cor}}}
 }
 \value{
-A list as formatted by \code{\link[=get_cor]{get_cor()}} (see this function's
+A list as formatted by \code{\link{get_cor}} (see this function's
 "Return" section).
 }
 \description{
-Combine lists formatted by \code{\link[=get_cor]{get_cor()}}.
+Combine lists formatted by \code{\link{get_cor}}.
 }

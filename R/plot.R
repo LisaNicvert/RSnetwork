@@ -269,7 +269,7 @@ multiplot <- function(indiv_row = NULL, indiv_col = NULL,
 #'
 #' Plot reciprocal scaling
 #'
-#' @param dudi An object of class [`ade4::dudi()`] to pair with the analysis.
+#' @param dudi An object of class [`ade4::dudi`] to pair with the analysis.
 #' Used for the eigenvalues (always) and for the arrows of explanatory variables
 #' if required.
 #' It must be of class `coa`, `pcaiv` or `dpcaiv` (obtained with the new function `dpcaiv2`).
@@ -520,11 +520,11 @@ plot_corcircle <- function(cor,
 #' @param df The dataframe containing the true data. It must have columns `mean`
 #' (used for the x-axis) and `sd` (y-axis).
 #' @param dat_pred The dataframe containing the predicted data (assumed to be over the true data range).
-#' It is assumed to be obtained with [get_pred()]. It must have columns `x`, `fit`, `lwr`, `upr`.
+#' It is assumed to be obtained with [`get_pred`]. It must have columns `x`, `fit`, `lwr`, `upr`.
 #' @param lab A label to add to the graph. If provided, will be added in the
 #' top-left corner.
 #' It must be a dataframe with at least one column `R2` (to create this dataframe,
-#' see [`lm_labels()`]).
+#' see [`lm_labels`]).
 #' If `facet` is not `NULL`, it must have a column `type` too.
 #' If it has a column `formula`, the formula will be displayed along
 #' with the coefficient of determination.
@@ -533,7 +533,7 @@ plot_corcircle <- function(cor,
 #' @param ylab Label of the y-axis
 #' @param text_size Size of the text (points labels and R squared).
 #' Other text (axes titles, panels) is scaled to be bigger.
-#' @param max.overlaps `max.overlaps` argument for [`ggrepel::geom_text_repel()`]
+#' @param max.overlaps `max.overlaps` argument for [`ggrepel::geom_text_repel`]
 #' @param xlab Label of the x-axis
 #' @param points_size Size of the points
 #' @param facet A column to use for facetting. Defaults to `NULL` (no facets).
@@ -542,7 +542,7 @@ plot_corcircle <- function(cor,
 #' @param facet_dir Direction of the facet grid: "h" for "horizontal and "v"
 #' for "vertical" (useful only if `facet` is not `NULL`)
 #' @param strip.position Strip position (useful only if `facet` is not `NULL`).
-#' See the documentation of [`ggplot2::facet_wrap()`] (argument `strip.position`).
+#' See the documentation of [`ggplot2::facet_wrap`] (argument `strip.position`).
 #'
 #' @return A ggplot object showing standard deviation vs mean,
 #' along with the predicted values of the linear model

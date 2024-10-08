@@ -22,13 +22,14 @@ The datasets contained in the `data/` folder come from a published datasets by D
 
 ## Running analyses
 
-To manage dependencies, this package uses [renv](https://rstudio.github.io/renv/index.html): R version and dependencies are stored in the `renv.lock` file and can be installed in a local project library using:
+To manage dependencies, this package uses [renv](https://rstudio.github.io/renv/index.html): R version and dependencies are stored in the `renv.lock` file and can be installed in a local project library.
+To install dependencies, open the project `RSnetwork.Rproj` with Rstudio (or launch R from the project folder in command line) and use:
 ```{r}
 renv::restore()
 ```
 The installed packages will not replace the packages from your R library, but will be installed and used for this project only.
 
-Then, install the custom `RSnetwork` package with:
+Then, install the custom `RSnetwork` package (note: you need to have `devtools` installed):
 ```{r}
 devtools::install_local(upgrade = "never")
 ```

@@ -7,7 +7,7 @@
 get_mean_sd(recscal, ax = 1:2)
 }
 \arguments{
-\item{recscal}{A dataframe (expected to be the output of \code{\link[=reciprocal.coa]{reciprocal.coa()}}).
+\item{recscal}{A dataframe (expected to be the output of \code{\link[ade4:score.coa]{ade4::reciprocal.coa}}).
 The first columns must contain the reciprocal scaling scores and the last 3 columns
 are \code{Row}, \code{Col} and \code{Weight}.}
 

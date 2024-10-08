@@ -22,7 +22,7 @@ get_pred(
 \item{level}{Confidence level used for the prediction. Defaults to 0.95.}
 
 \item{interval}{The type of interval to use: the argument is used in
-\code{\link[stats:predict.lm]{stats::predict.lm()}} and has the same interpretation.
+\code{\link[stats:predict.lm]{stats::predict.lm}} and has the same interpretation.
 \code{confidence} gives the confidence interval around the mean of the observations whereas \code{prediction} gives
 the confidence interval of predicted values.}
 }

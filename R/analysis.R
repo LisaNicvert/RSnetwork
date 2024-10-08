@@ -15,7 +15,7 @@
 #'
 #' Return the mean and standard deviation from a reciprocal scaling analysis
 #'
-#' @param recscal A dataframe (expected to be the output of [`reciprocal.coa()`]).
+#' @param recscal A dataframe (expected to be the output of [`ade4::reciprocal.coa`]).
 #' The first columns must contain the reciprocal scaling scores and the last 3 columns
 #' are `Row`, `Col` and `Weight`.
 #' @param ax the axes for which to compute mean and variance
@@ -122,7 +122,7 @@ get_best_model <- function(lmsimple, lm2, method = c("LRT", "AIC"),
 #' @param by The step to use for the range of `dat_predict` values
 #' @param level Confidence level used for the prediction. Defaults to 0.95.
 #' @param interval The type of interval to use: the argument is used in
-#' [`stats::predict.lm()`] and has the same interpretation.
+#' [`stats::predict.lm`] and has the same interpretation.
 #' `confidence` gives the confidence interval around the mean of the observations whereas `prediction` gives
 #' the confidence interval of predicted values.
 #'

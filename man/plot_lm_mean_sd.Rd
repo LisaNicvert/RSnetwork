@@ -25,7 +25,7 @@ plot_lm_mean_sd(
 (used for the x-axis) and \code{sd} (y-axis).}
 
 \item{dat_pred}{The dataframe containing the predicted data (assumed to be over the true data range).
-It is assumed to be obtained with \code{\link[=get_pred]{get_pred()}}. It must have columns \code{x}, \code{fit}, \code{lwr}, \code{upr}.}
+It is assumed to be obtained with \code{\link{get_pred}}. It must have columns \code{x}, \code{fit}, \code{lwr}, \code{upr}.}
 
 \item{col}{Color of the data points and prediction line. If there are facets,
 it should have length 2 (one color per facet).}
@@ -37,7 +37,7 @@ it should have length 2 (one color per facet).}
 \item{lab}{A label to add to the graph. If provided, will be added in the
 top-left corner.
 It must be a dataframe with at least one column \code{R2} (to create this dataframe,
-see \code{\link[=lm_labels]{lm_labels()}}).
+see \code{\link{lm_labels}}).
 If \code{facet} is not \code{NULL}, it must have a column \code{type} too.
 If it has a column \code{formula}, the formula will be displayed along
 with the coefficient of determination.}
@@ -53,12 +53,12 @@ Other text (axes titles, panels) is scaled to be bigger.}
 for "vertical" (useful only if \code{facet} is not \code{NULL})}
 
 \item{strip.position}{Strip position (useful only if \code{facet} is not \code{NULL}).
-See the documentation of \code{\link[ggplot2:facet_wrap]{ggplot2::facet_wrap()}} (argument \code{strip.position}).}
+See the documentation of \code{\link[ggplot2:facet_wrap]{ggplot2::facet_wrap}} (argument \code{strip.position}).}
 
 \item{nudge_x}{Nudge to use for top left corner labels. If \code{NULL}, defaults to
 1 \% of the range.}
 
-\item{max.overlaps}{\code{max.overlaps} argument for \code{\link[ggrepel:geom_text_repel]{ggrepel::geom_text_repel()}}}
+\item{max.overlaps}{\code{max.overlaps} argument for \code{\link[ggrepel:geom_text_repel]{ggrepel::geom_text_repel}}}
 }
 \value{
 A ggplot object showing standard deviation vs mean,

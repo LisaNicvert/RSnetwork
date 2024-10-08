@@ -16,7 +16,7 @@
 #' Returns the fundamental and realized niches and the niches returned
 #' by reciprocal scaling.
 #'
-#' @param rec A dataframe (expected to be the output of [`reciprocal.coa()`]).
+#' @param rec A dataframe (expected to be the output of [`ade4::reciprocal.coa`]).
 #' The first 2 columns must contain the reciprocal scaling scores (there can be more axes, but only
 #' the first 2 will be used.) The last 3 columns are `Row`, `Col` and `Weight`.
 #' @param comm The observed community matrix. It is used to get the
@@ -190,7 +190,7 @@ get_niches <- function(rec, comm,
 #' and the fundamental and realized niches.
 #'
 #' @param niches An object containing the fundamental, realized and multivariate niches
-#' (output of [get_niches()])
+#' (output of [`get_niches`])
 #'
 #' @return A list of lists. The first element (named `fundamental`) contains the correlations with the
 #' fundamental niche values and the second element (named `realized`)
@@ -335,7 +335,7 @@ get_cor <- function(niches) {
 #'
 #' Adds parameters value to simulation results dataframe.
 #'
-#' @param corsim a list with the correlation values (output of [get_cor()]).
+#' @param corsim a list with the correlation values (output of [`get_cor`]).
 #' @param paramvec A vector of parameters (must be a 1-row dataframe)
 #'
 #' @return The list `corsim` with added columns in each dataframe of the list.
@@ -362,12 +362,12 @@ add_params <- function(corsim, paramvec) {
 
 #' Combine correlations
 #'
-#' Combine lists formatted by [get_cor()].
+#' Combine lists formatted by [`get_cor`].
 #'
-#' @param a First list formatted by [get_cor()]
-#' @param b Second list formatted by [get_cor()]
+#' @param a First list formatted by [`get_cor`]
+#' @param b Second list formatted by [`get_cor`]
 #'
-#' @return A list as formatted by [get_cor()] (see this function's
+#' @return A list as formatted by [`get_cor`] (see this function's
 #' "Return" section).
 #' @export
 combine_cor <- function(a, b) {

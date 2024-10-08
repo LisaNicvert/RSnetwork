@@ -23,7 +23,7 @@ plot_reciprocal(
 )
 }
 \arguments{
-\item{dudi}{An object of class \code{\link[ade4:dudi]{ade4::dudi()}} to pair with the analysis.
+\item{dudi}{An object of class \code{\link[ade4:dudi]{ade4::dudi}} to pair with the analysis.
 Used for the eigenvalues (always) and for the arrows of explanatory variables
 if required.
 It must be of class \code{coa}, \code{pcaiv} or \code{dpcaiv} (obtained with the new function \code{dpcaiv2}).}

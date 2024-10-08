@@ -14,7 +14,7 @@ get_niches(
 )
 }
 \arguments{
-\item{rec}{A dataframe (expected to be the output of \code{\link[=reciprocal.coa]{reciprocal.coa()}}).
+\item{rec}{A dataframe (expected to be the output of \code{\link[ade4:score.coa]{ade4::reciprocal.coa}}).
 The first 2 columns must contain the reciprocal scaling scores (there can be more axes, but only
 the first 2 will be used.) The last 3 columns are \code{Row}, \code{Col} and \code{Weight}.}
 

@@ -8,7 +8,7 @@ get_cor(niches)
 }
 \arguments{
 \item{niches}{An object containing the fundamental, realized and multivariate niches
-(output of \code{\link[=get_niches]{get_niches()}})}
+(output of \code{\link{get_niches}})}
 }
 \value{
 A list of lists. The first element (named \code{fundamental}) contains the correlations with the
