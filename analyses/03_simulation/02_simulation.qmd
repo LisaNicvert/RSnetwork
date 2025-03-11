@@ -61,7 +61,7 @@ ninter <- c(200, 500, 5000, 10000)
 abund_distri <- c("1_unif", "2_skewlow", "3_skewmid", "4_skewhigh")
 delta <- seq(0, 1, by = 0.2) 
 
-nrep <- 10
+nrep <- 100
 
 le_grad <- 100
 buffer <- 0
@@ -618,10 +618,10 @@ eigval_df_summary <- eigval_df_summary |>
 ```{r}
 # ggsave doesn't work with formulas in axes
 png(file.path(figures_path,
-              paste0("lambda_evolution_ninter.png")),
-    width = 15, height = 7.5,
+              paste0("lambda_evolution_delta.png")),
+    width = 15, height = 18,
     units = "cm",
-    res = 300)
+    res = 600)
 ggplot(eigval_df_summary, 
        aes(x = delta, group = eig_name)) +
   geom_errorbar(aes(ymin = inf, ymax = sup, col = eig_name),
@@ -633,11 +633,11 @@ ggplot(eigval_df_summary,
   scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
   theme_linedraw() +
   ylim(0, 1) +
-  xlab(paste0("Strength of trait matching (", 
-              expression(delta), ")")) +
+  xlab(expression("Strength of trait matching ("*delta*")")) +
   ylab(expression(sqrt(lambda[k]))) +
   theme(legend.position = "none",
-        axis.title = element_text(size = 11))
+        axis.title = element_text(size = 11),
+        plot.margin = margin(1, 1, 1, 1, "cm"))
 dev.off()
 ```
 
