@@ -13,6 +13,7 @@ plot_lm_mean_sd(
   lab = NULL,
   text_size = 3,
   points_size = 1,
+  seed = NA,
   facet = NULL,
   facet_dir = c("h", "v"),
   strip.position = "top",
@@ -42,10 +43,12 @@ If \code{facet} is not \code{NULL}, it must have a column \code{type} too.
 If it has a column \code{formula}, the formula will be displayed along
 with the coefficient of determination.}
 
-\item{text_size}{Size of the text (points labels and R squared).
-Other text (axes titles, panels) is scaled to be bigger.}
+\item{text_size}{Size of the points labels.
+Other text (R squared, axes titles, panels) is scaled to be bigger.}
 
 \item{points_size}{Size of the points}
+
+\item{seed}{seed for \code{geom_text_repel}}
 
 \item{facet}{A column to use for facetting. Defaults to \code{NULL} (no facets).}
 

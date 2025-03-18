@@ -547,8 +547,8 @@ plot_corcircle <- function(cor,
 #' @param col Color of the data points and prediction line. If there are facets,
 #' it should have length 2 (one color per facet).
 #' @param ylab Label of the y-axis
-#' @param text_size Size of the text (points labels and R squared).
-#' Other text (axes titles, panels) is scaled to be bigger.
+#' @param text_size Size of the points labels.
+#' Other text (R squared, axes titles, panels) is scaled to be bigger.
 #' @param max.overlaps `max.overlaps` argument for [`ggrepel::geom_text_repel`]
 #' @param xlab Label of the x-axis
 #' @param points_size Size of the points
@@ -559,6 +559,7 @@ plot_corcircle <- function(cor,
 #' for "vertical" (useful only if `facet` is not `NULL`)
 #' @param strip.position Strip position (useful only if `facet` is not `NULL`).
 #' See the documentation of [`ggplot2::facet_wrap`] (argument `strip.position`).
+#' @param seed seed for `geom_text_repel`
 #'
 #' @return A ggplot object showing standard deviation vs mean,
 #' along with the predicted values of the linear model
@@ -572,6 +573,7 @@ plot_lm_mean_sd <- function(df,
                             lab = NULL,
                             text_size = 3,
                             points_size = 1,
+                            seed = NA,
                             facet = NULL,
                             facet_dir = c("h", "v"),
                             strip.position = "top",
@@ -622,7 +624,9 @@ plot_lm_mean_sd <- function(df,
                  show.legend = FALSE) +
       scale_color_manual(values = col) +
       theme(strip.background = element_rect(fill = "white"),
-            strip.text = element_text(color = "black", size = text_size*4))
+            strip.text = element_text(color = "black", size = text_size*4),
+            axis.title = element_text(size = text_size*4),
+            axis.text = element_text(size = text_size*3.5))
   } else {
     p <- p +
       geom_point(aes(x = mean, y = sd),
@@ -636,6 +640,7 @@ plot_lm_mean_sd <- function(df,
                         label = rownames(df)),
                     data = df,
                     size = text_size,
+                    seed = seed,
                     max.overlaps = max.overlaps) +
     xlab(xlab) +
     ylab(ylab)
@@ -653,7 +658,7 @@ plot_lm_mean_sd <- function(df,
       geom_text(data = lab,
                 aes(label = r2),
                 parse = TRUE,
-                size = text_size,
+                size = text_size*1.2,
                 x = xmin + nudge_x,
                 y = Inf,
                 hjust = 0, vjust = 1.4)
@@ -663,7 +668,7 @@ plot_lm_mean_sd <- function(df,
         geom_text(data = lab,
                   aes(label = formula),
                   parse = TRUE,
-                  size = text_size,
+                  size = text_size*1.2,
                   x = xmin + nudge_x,
                   y = Inf,
                   hjust = 0, vjust = 2.4)
