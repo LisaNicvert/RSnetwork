@@ -338,6 +338,8 @@ plot_reciprocal <- function(dudi, recscal,
     ylab <- paste0("Axis ", yax, " (", explained_var[2],"%)")
   }
 
+  axis_title_padding <- 1.3
+  padding <- 1
   if(group == "li"){
     s.class(dfxy = recscal[,c(xax, yax)],
             fac = as.factor(recscal$Row),
@@ -351,6 +353,13 @@ plot_reciprocal <- function(dudi, recscal,
             plegend.drawKey = FALSE,
             pellipses.alpha = alpha,
             col = col,
+            layout.heights = list(axis.xlab.padding = axis_title_padding,
+                                  bottom.padding = padding,
+                                  top.padding = padding),
+            layout.widths = list(ylab.axis.padding = axis_title_padding,
+                                 left.padding = padding,
+                                 right.padding = padding),
+            pbackground.box = FALSE,
             ...)
   }else if(group == "co"){
     s.class(dfxy = recscal[,c(xax, yax)],
@@ -365,6 +374,13 @@ plot_reciprocal <- function(dudi, recscal,
             plegend.drawKey = FALSE,
             pellipses.alpha = alpha,
             col = col,
+            layout.heights = list(axis.xlab.padding = axis_title_padding,
+                                  bottom.padding = padding,
+                                  top.padding = padding),
+            layout.widths = list(ylab.axis.padding = axis_title_padding,
+                                 left.padding = padding,
+                                 right.padding = padding),
+            pbackground.box = FALSE,
             ...)
   }
 
