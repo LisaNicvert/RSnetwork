@@ -309,12 +309,14 @@ if(params$log) {
 
 breaks <- c(1, 10, 100, 500)
 
+txtsize <- 14
+
 # Visualize filtered matrix
 plot_matrix(interactions, 
             legend_title = ifelse(params$log, 
                                   "ln(frequency)", "Frequency"), 
             max_size = msize,
-            base_size = 9,
+            base_size = txtsize,
             breaks = breaks,
             trans = "log1p",
             xlab = "Birds") +
@@ -324,6 +326,7 @@ plot_matrix(interactions,
         axis.ticks.x.top = element_line(colour = params$colco),
         axis.line.y = element_line(colour = params$colli, 
                                    linewidth = 1),
+        axis.text = element_text(size = txtsize*0.4),
         axis.ticks.y = element_line(colour = params$colli))
 
 # Export plot
@@ -498,18 +501,17 @@ plot_matrix(interactions_reordered,
             legend_title = ifelse(params$log, 
                                   "ln(frequency)", "Frequency"), 
             max_size = msize,
-            base_size = 9,
+            base_size = txtsize,
             breaks = breaks,
             trans = "log1p",
             xlab = "Birds") +
   theme(legend.key.width = unit(0.1, 'cm'),
         axis.line.x.top = element_line(colour = params$colco,
-                                       # lineend = "butt",
                                        linewidth = 1),
         axis.ticks.x.top = element_line(colour = params$colco),
         axis.line.y = element_line(colour = params$colli, 
-                                   # lineend = "square",
                                    linewidth = 1),
+        axis.text = element_text(size = txtsize*0.4),
         axis.ticks.y = element_line(colour = params$colli))
 
 # Export plot
@@ -703,6 +705,7 @@ colrow <- viridis(nrow(interactions), option = "G", end = 0.9)
 # Order palette so that colors match position on axis 1
 colrow <- colrow[rank(ca$li[[1]])]
 
+txtsize <- 1.3
 # png(file.path(figures_path, "plant_ell.png"),
 #     bg = "white",
 #     res = 600,
@@ -710,6 +713,10 @@ colrow <- colrow[rank(ca$li[[1]])]
 plot_reciprocal(recscal = recscal,
                 dudi = ca,
                 col = colrow,
+                labsize = txtsize*0.8,
+                pgrid.text.cex = txtsize,
+                xlab.cex = txtsize,
+                ylab.cex = txtsize,
                 group = "li",
                 xax = 1, yax = 2)
 # dev.off()
@@ -734,9 +741,13 @@ colco <- colco[rank(ca$co[[1]])]
 #     width = 15, height = 15, units = "cm")
 plot_reciprocal(recscal = recscal, 
                 dudi = ca,
+                col = colco,
+                labsize = txtsize*0.8,
+                pgrid.text.cex = txtsize,
+                xlab.cex = txtsize,
+                ylab.cex = txtsize,
                 group = "co", 
-                xax = 1, yax = 2,
-                col = colco)
+                xax = 1, yax = 2)
 # dev.off()
 
 plot_reciprocal(recscal = recscal, 
@@ -837,7 +848,8 @@ for(a in ax){
                                   nudge_x = 0.1,
                                   col = c(params$colco, params$colli), 
                                   lab = lab_df,
-                                  ylab = paste0("Niche breadth (standard deviation on axis ", a, ")"), 
+                                  seed = 123,
+                                  ylab = paste0("Niche breadth\n(standard deviation on axis ", a, ")"), 
                                   xlab = paste0("Niche optimum (mean position on axis ", a, ")"), 
                                   facet = "type")
   
@@ -859,7 +871,7 @@ for(a in ax){
     ggtitle(paste("Plant niche width versus number of interacting partners on axis", a)) +
     xlim(c(0, max(rowSums(interactions != 0))))
   
-  gbirds2 <- c(gbirds2, list(gb2))
+  # gbirds2 <- c(gbirds2, list(gb2))
   gplants2 <- c(gplants2, list(gp2))
   
 }
@@ -868,8 +880,7 @@ for(a in ax){
 ```{r, fig.width=8, fig.height=4, warning = FALSE}
 lmplots[[1]] + 
   ylim(0, 1.8) +
-  theme(plot.margin = margin(5, 10, 0, 5),
-        text = element_text(size = ts*3.5))
+  theme(plot.margin = margin(5, 10, 0, 5))
 # Export plot
 ggsave(file.path(figures_path, "lm_ax1.jpeg"),
        width = 18, height = 8, 
@@ -908,13 +919,19 @@ Below is the a posteriori correlation circle between the axes and the traits:
 rownames(corli) <- c("fruit diameter", "plant height", "crop mass")
 rownames(corco) <- c("Kipp's index", "bill width", "body mass")
 
+txtsize <- 15
 plot_corcircle(cor = corli,
                col = params$colli,
                cor2 = corco,
                lty = "longdash",
                lty2 = "solid",
                col2 = params$colco,
-               eig = ca$eig)
+               labsize = 5,
+               eig = ca$eig) +
+  theme(axis.title = element_text(size = txtsize),
+        axis.text = element_text(size = txtsize*0.9),
+        plot.background = element_rect(fill = "transparent", color = NA))
+
 ggsave(file.path(figures_path, "corcircle.svg"),
        width = 15, height = 13, units = "cm")
 
@@ -922,10 +939,15 @@ plot_corcircle(cor = corli,
                col = params$colli,
                xax = 2, yax = 3,
                cor2 = corco,
-               lty = "solid",
-               lty2 = "longdash",
+               lty = "longdash",
+               lty2 = "solid",
                col2 = params$colco,
-               eig = ca$eig)
+               labsize = 5,
+               eig = ca$eig) +
+  theme(axis.title = element_text(size = txtsize),
+        axis.text = element_text(size = txtsize*0.9),
+        plot.background = element_rect(fill = "transparent", color = NA))
+
 ```
 
 ```{r}
