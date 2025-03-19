@@ -1,6 +1,6 @@
 Package: RSnetwork
 Title: Ecological Networks Analysis with Reciprocal Scaling
-Version: 1.0.0
+Version: 1.0.1
 Authors@R: 
     person("Lisa", "Nicvert", , "lisa.nicvert@univ-lyon1.fr", role = c("aut", "cre"),
            comment = c(ORCID = "0009-0006-5763-0865"))
@@ -23,4 +23,3 @@ Imports:
     tibble,
     tidyr,
     tidyselect
-    
