@@ -2,7 +2,7 @@
 
 This repository contains the code and data to reproduce the analyses and figures for the following article:
 
-> Nicvert, L., Fritz, H. & Dray, S. (in prep.). Trait matching without traits: using correspondence analysis to analyze the latent structure of interaction network.
+> Nicvert, L., Fritz, H. & Dray, S. (in prep.). Trait matching without traits: using correspondence analysis to analyze the latent structure of interaction networks.
 
 The datasets contained in the `data/` folder come from a published datasets by Dehling et al. (2021).
 
@@ -47,7 +47,7 @@ In case you prefer to install packages manually in your personal R library, deac
 
 The code used to perform analyses and produce figures of this project is licensed under the Creative Commons Attribution 4.0 International License.
 
-The underlying source code used generate content (contained in the R/ folder and associated to the package) is licensed under the GPL >= 2 licence.
+The underlying source code used generate content (contained in the R/ folder and associated to the package) is licensed under the MIT licence.
 
 For data licences, see the original data paper by Dehling et al. (2021).
 
@@ -55,4 +55,4 @@ For data licences, see the original data paper by Dehling et al. (2021).
 
 Dehling, D. M., Bender, I. M. A., Blendinger, P. G., Muñoz, M. C., Quitián, M., Saavedra, F., Santillán, V., Böhning-Gaese, K., Neuschulz, E.-L., & Schleuning, M. (2021). ANDEAN frugivory: Data on plant-bird interactions and functional traits of plant and bird species from montane forests along the Andes (Version 2, p. 187397 bytes) [dataset]. Dryad. https://doi.org/10.5061/DRYAD.WM37PVMN5
 
-Nicvert, L., Fritz, H. & Dray, S. (in prep.). Trait matching without traits: using correspondence analysis to analyze the latent structure of interaction network.
+Nicvert, L., Fritz, H. & Dray, S. (in prep.). Trait matching without traits: using correspondence analysis to analyze the latent structure of interaction networks.
