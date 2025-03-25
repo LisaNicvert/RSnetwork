@@ -194,11 +194,11 @@ paramdf <- paramdf |>
 ```{r}
 # Create a dataframe of legends for the plots
 legend_df <- data.frame(exp = unique(paramdf$exp))
-legend_df$legend <- c("Number of interactions",
-                      "Species abundance distribution",
-                      "Mean consumers niche breadth",
-                      "Standard deviation of consumers niche breadth",
-                      "Trait matching strength")
+legend_df$legend <- c(expression("Number of interactions ("*italic(n)[inter]*")"),
+                      expression("Species abundance distribution ("*bold(n^r)*","*bold(n^c)*")"),
+                      expression("Mean consumers niche breadth ("*italic(mu)[breadth]*")"),
+                      expression("Standard deviation of consumers niche breadth ("*sigma[breadth]*")"),
+                      expression("Trait matching strength ("*delta*")"))
 ```
 
 ## Simulations
@@ -565,11 +565,13 @@ for(exp_plot in unique(dfmean$exp)) { # experiments
 
 ```{r, fig.height=8, fig.width=6}
 for (n in names(boxplots_list)) {
+  # ggsave doesn't work well with formulas in axes
+  # png(file.path(figures_path, paste0("boxplots_", n, ".png")),
+  #     width = 15, height = 18,
+  #     units = "cm",
+  #     res = 600)
   print(boxplots_list[[n]])
-  ggsave(file.path(figures_path, paste0("boxplots_", n, ".png")),
-       width = 15, height = 18,
-       units = "cm",
-       dpi = 600)
+  # dev.off()
 }
 ```
 
@@ -942,12 +944,12 @@ for(exp_plot in unique(dfsd_level$exp)) {
 
 ```{r, fig.height=8, fig.width=6}
 for (n in names(boxplots_list)) {
+  # png(file.path(figures_path,paste0("re_fu_boxplots_",
+  #                                   n, ".png")),
+  #     width = 15, height = 18,
+  #     units = "cm",
+  #     res = 600)
   print(boxplots_list[[n]])
-  ggsave(file.path(figures_path,
-                   paste0("re_fu_boxplots_",
-                          n, ".png")),
-         width = 15, height = 18,
-         units = "cm",
-         dpi = 600)
+  # dev.off()
 }
 ```
