@@ -4,12 +4,24 @@
 \alias{plot_eig}
 \title{Plot eigenvalues}
 \usage{
-plot_eig(eigenvalues, showrank = FALSE)
+plot_eig(
+  eigenvalues,
+  showrank = FALSE,
+  writeval = FALSE,
+  val_size = 2,
+  val_round = 2
+)
 }
 \arguments{
 \item{eigenvalues}{The eigenvalues}
 
 \item{showrank}{Should the x-axis display the rank of the eigenvalues?}
+
+\item{writeval}{Write eigenvaluies on top of bars?}
+
+\item{val_size}{Size of eigenvalues written on top of bars}
+
+\item{val_round}{Rounding for eigenvalues writing}
 }
 \value{
 A ggplot with the eigenvalues displayed as a barplot.

@@ -89,10 +89,14 @@ plot_matrix <- function(mat, tile_fill = "white",
 #'
 #' @param eigenvalues The eigenvalues
 #' @param showrank Should the x-axis display the rank of the eigenvalues?
+#' @param writeval Write eigenvaluies on top of bars?
+#' @param val_size Size of eigenvalues written on top of bars
+#' @param val_round Rounding for eigenvalues writing
 #'
 #' @return A ggplot with the eigenvalues displayed as a barplot.
 #' @export
-plot_eig <- function(eigenvalues, showrank = FALSE) {
+plot_eig <- function(eigenvalues, showrank = FALSE,
+                     writeval = FALSE, val_size = 2, val_round = 2) {
 
   gg <- ggplot() +
     geom_col(aes(y = eigenvalues, x = factor(1:length(eigenvalues)))) +
@@ -105,6 +109,13 @@ plot_eig <- function(eigenvalues, showrank = FALSE) {
     gg <- gg +
       theme(axis.text.x = element_blank(),
             axis.ticks.x = element_blank())
+  }
+  if (writeval) {
+    gg <- gg +
+      geom_text(aes(x = factor(1:length(eigenvalues)),
+                    y = eigenvalues, label = round(eigenvalues, val_round)),
+                size = val_size,
+                vjust = -0.2)
   }
   gg
 }
