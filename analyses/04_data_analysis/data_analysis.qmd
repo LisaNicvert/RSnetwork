@@ -478,17 +478,26 @@ sqrt(ca$eig)
 Below are the corresponding eigenvalues graphs:
 
 ```{r plot_eigen, fig.height=3, fig.width=5}
-plot_eig(ca$eig) + 
-  ggtitle("Eigenvalues") +
-  theme(axis.title.y = element_blank())
+plot_eig(ca$eig, showrank = TRUE) +
+  ylab("Eigenvalues") +
+  theme(axis.title = element_text(size = 15),
+        axis.text = element_text(size = 10))
+# ggsave(file.path(figures_path, "eig.png"),
+#        width = 7, height = 4.5, dpi = 300)
 
-plot_eig(sqrt(ca$eig)) + 
-  ggtitle("Square roots of eigenvalues") +
-  theme(axis.title.y = element_blank())
+plot_eig(sqrt(ca$eig), showrank = TRUE) + 
+  ylab("Square root of eigenvalues") +
+  theme(axis.title = element_text(size = 15),
+        axis.text = element_text(size = 10))
+ggsave(file.path(figures_path, "sqeig.png"),
+       width = 7, height = 4.5, dpi = 300)
 
-plot_eig(cumsum(ca$eig)/sum(ca$eig)) +
-  ggtitle("Cumulative sum of relative eigenvalues") +
-  theme(axis.title.y = element_blank())
+plot_eig(cumsum(ca$eig)/sum(ca$eig), showrank = TRUE) +
+  ylab("Relative cumulative sum of eigenvalues") +
+  theme(axis.title = element_text(size = 15),
+        axis.text = element_text(size = 10))
+ggsave(file.path(figures_path, "cumsumeig.png"),
+       width = 7, height = 4.5, dpi = 300)
 ```
 
 Below is the interaction matrix reordered with the first axis of the CA:
@@ -850,7 +859,7 @@ for(a in ax){
                                   lab = lab_df,
                                   seed = 123,
                                   ylab = paste0("Niche breadth\n(standard deviation on axis ", a, ")"), 
-                                  xlab = paste0("Niche optimum (mean position on axis ", a, ")"), 
+                                  xlab = paste0("Latent trait (mean position on axis ", a, ")"), 
                                   facet = "type")
   
   lmbirds[[a]] <- lmb
@@ -879,7 +888,6 @@ for(a in ax){
 
 ```{r, fig.width=8, fig.height=4, warning = FALSE}
 lmplots[[1]] + 
-  ylim(0, 1.8) +
   theme(plot.margin = margin(5, 10, 0, 5))
 # Export plot
 ggsave(file.path(figures_path, "lm_ax1.jpeg"),
@@ -979,7 +987,7 @@ names(lm_li) <- paste0("Ax", 1:length(lm_li))
 lapply(lm_li, summary)
 ```
 
-Then, we pot the relationship between CA coordinates and the residuals of these models.
+Then, we plot the relationship between CA coordinates and the residuals of these models.
 
 ```{r}
 res_list <- lapply(seq_along(lm_li), 
